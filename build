@@ -1,4 +1,0 @@
-#!/bin/sh
-flex -oparser.lex.cpp -d -L parser.l
-bison --debug --verbose -d -o parser.yacc.cpp parser.y
-g++ -ggdb -Wall parser.lex.cpp parser.yacc.cpp node.cpp fbjs.cpp -o fbjs
