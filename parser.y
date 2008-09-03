@@ -33,48 +33,6 @@ void yyerror(YYLTYPE* yyloc, void* yyscanner, void* node, const char* str) {
   parser_note_error(yyscanner, loc);
 }
 
-int main() {
-
-  void* scanner;
-  fbjs_parse_extra extra;
-  yylex_init_extra(&extra, &scanner);
-
-#ifdef DEBUG_BISON
-  yydebug = 1;
-#endif
-#ifdef DEBUG_FLEX
-  yyset_debug(1, scanner);
-#endif
-  extra.lineno = 1;
-  extra.last_tok = 0;
-  extra.last_paren_tok = 0;
-
-  Node* root = new Node();
-  yyparse(scanner, root);
-  yylex_destroy(scanner);
-
-  fbjsize_guts_t guts;
-  guts.app_id = "123";
-  root = fbjsize(root, &guts);
-  if (!extra.errors.empty()) {
-    list<string>::iterator i;
-    for (i = extra.errors.begin(); i != extra.errors.end(); i++) {
-      std::cout<<(*i)<<"\n";
-    }
-    return 1;
-  }
-
-  node_render_opts_t render_opts;
-  render_opts.indentation = 0;
-  render_opts.pretty = false;
-  rope_t rendered = root->render(&render_opts);
-  delete root;
-  std::cout<<rendered;
-  printf("\n");
-  return 0;
-}
-
-
 %}
 
 %locations
@@ -945,10 +903,10 @@ finally:
 // here, we go with ECMA-262.
 function_declaration:
     t_FUNCTION identifier t_LPAREN formal_parameter_list t_RPAREN t_LCURLY function_body t_RCURLY {
-      $$ = (new NodeFunction())->appendChild($2)->appendChild($4)->appendChild($7);
+      $$ = (new NodeFunction(true))->appendChild($2)->appendChild($4)->appendChild($7);
     }
 |   t_FUNCTION identifier t_LPAREN t_RPAREN t_LCURLY function_body t_RCURLY {
-      $$ = (new NodeFunction())->appendChild($2)->appendChild(new NodeArgList())->appendChild($6);
+      $$ = (new NodeFunction(true))->appendChild($2)->appendChild(new NodeArgList())->appendChild($6);
     }
 ;
 function_expression:

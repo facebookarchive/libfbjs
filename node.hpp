@@ -22,6 +22,7 @@ namespace fbjs {
   class Node {
     protected:
       node_list_t _childNodes;
+      Node* _parentNode;
 
     public:
       Node();
@@ -32,7 +33,8 @@ namespace fbjs {
       bool empty() const;
 
       node_list_t& childNodes();
-      Node* appendChild(Node* node);
+      Node* parentNode();
+      virtual Node* appendChild(Node* node);
       Node* removeChild(node_list_t::iterator node_pos);
       Node* replaceChild(Node* node, node_list_t::iterator node_pos);
       Node* insertBefore(Node* node, node_list_t::iterator node_pos);
@@ -49,6 +51,7 @@ namespace fbjs {
 
     public:
       NodeBlock();
+      virtual Node* clone(Node* node = NULL);
       virtual rope_t render(node_render_opts_t* opts) const;
       NodeBlock* requireBraces();
   };
@@ -57,7 +60,9 @@ namespace fbjs {
   // NodeStatementList
   class NodeStatementList: public Node {
     public:
+      virtual Node* clone(Node* node = NULL);
       virtual rope_t render(node_render_opts_t* opts) const;
+      virtual Node* appendChild(Node* node);
   };
 
 
@@ -99,6 +104,7 @@ namespace fbjs {
   // NodeNullLiteral
   class NodeNullLiteral: public Node {
     public:
+      virtual Node* clone(Node* node = NULL);
       virtual rope_t render(node_render_opts_t* opts) const;
   };
 
@@ -106,6 +112,7 @@ namespace fbjs {
   // NodeThis
   class NodeThis: public Node {
     public:
+      virtual Node* clone(Node* node = NULL);
       virtual rope_t render(node_render_opts_t* opts) const;
   };
 
@@ -113,6 +120,7 @@ namespace fbjs {
   // NodeEmptyExpression
   class NodeEmptyExpression: public Node {
     public:
+      virtual Node* clone(Node* node = NULL);
       virtual rope_t render(node_render_opts_t* opts) const;
   };
 
@@ -141,6 +149,7 @@ namespace fbjs {
   // NodeConditionalExpression
   class NodeConditionalExpression: public Node {
     public:
+      virtual Node* clone(Node* node = NULL);
       virtual rope_t render(node_render_opts_t* opts) const;
   };
 
@@ -148,6 +157,7 @@ namespace fbjs {
   // NodeParenthetical
   class NodeParenthetical: public Node {
     public:
+      virtual Node* clone(Node* node = NULL);
       virtual rope_t render(node_render_opts_t* opts) const;
       virtual Node* identifier();
   };
@@ -217,37 +227,53 @@ namespace fbjs {
   //
   // NodeArgList
   class NodeArgList: public Node {
-    virtual rope_t render(node_render_opts_t* opts) const;
+    public:
+      virtual Node* clone(Node* node = NULL);
+      virtual rope_t render(node_render_opts_t* opts) const;
   };
 
   //
   // NodeFunction
   class NodeFunction: public Node {
-    virtual rope_t render(node_render_opts_t* opts) const;
+    protected:
+      bool _declaration;
+    public:
+      NodeFunction(bool declaration = false);
+      virtual Node* clone(Node* node = NULL);
+      virtual bool declaration() const;
+      virtual rope_t render(node_render_opts_t* opts) const;
   };
 
   //
   // NodeFunctionCall
   class NodeFunctionCall: public Node {
-    virtual rope_t render(node_render_opts_t* opts) const;
+    public:
+      virtual rope_t render(node_render_opts_t* opts) const;
+      virtual Node* clone(Node* node = NULL);
   };
 
   //
   // NodeFunctionConstructor
   class NodeFunctionConstructor: public Node {
-    virtual rope_t render(node_render_opts_t* opts) const;
+    public:
+      virtual Node* clone(Node* node = NULL);
+      virtual rope_t render(node_render_opts_t* opts) const;
   };
 
   //
   // NodeIf
   class NodeIf: public Node {
-    virtual rope_t render(node_render_opts_t* opts) const;
+    public:
+      virtual Node* clone(Node* node = NULL);
+      virtual rope_t render(node_render_opts_t* opts) const;
   };
 
   //
   // NodeTry
   class NodeTry: public Node {
-    virtual rope_t render(node_render_opts_t* opts) const;
+    public:
+      virtual Node* clone(Node* node = NULL);
+      virtual rope_t render(node_render_opts_t* opts) const;
   };
 
   //
@@ -267,49 +293,64 @@ namespace fbjs {
   //
   // NodeLabel
   class NodeLabel: public Node {
-    virtual rope_t render(node_render_opts_t* opts) const;
+    public:
+      virtual Node* clone(Node* node = NULL);
+      virtual rope_t render(node_render_opts_t* opts) const;
   };
 
   //
   // NodeCaseClause
   class NodeCaseClause: public Node {
-    virtual rope_t render(node_render_opts_t* opts) const;
+    public:
+      virtual Node* clone(Node* node = NULL);
+      virtual rope_t render(node_render_opts_t* opts) const;
   };
 
   //
   // NodeCaseClauseList
   class NodeCaseClauseList: public Node {
-    virtual rope_t render(node_render_opts_t* opts) const;
+    public:
+      virtual Node* clone(Node* node = NULL);
+      virtual rope_t render(node_render_opts_t* opts) const;
   };
 
   //
   // NodeSwitch
   class NodeSwitch: public Node {
-    virtual rope_t render(node_render_opts_t* opts) const;
+    public:
+      virtual Node* clone(Node* node = NULL);
+      virtual rope_t render(node_render_opts_t* opts) const;
   };
 
   //
   // NodeDefaultClause
   class NodeDefaultClause: public Node {
-    virtual rope_t render(node_render_opts_t* opts) const;
+    public:
+      virtual Node* clone(Node* node = NULL);
+      virtual rope_t render(node_render_opts_t* opts) const;
   };
 
   //
   // NodeCauseClause
   class NodeCauseClause: public Node {
-    virtual rope_t render(node_render_opts_t* opts) const;
+    public:
+      virtual Node* clone(Node* node = NULL);
+      virtual rope_t render(node_render_opts_t* opts) const;
   };
 
   //
   // NodeCauseClauseList
   class NodeCauseClauseList: public Node {
-    virtual rope_t render(node_render_opts_t* opts) const;
+    public:
+      virtual Node* clone(Node* node = NULL);
+      virtual rope_t render(node_render_opts_t* opts) const;
   };
 
   //
   // NodeVarDeclaration
   class NodeVarDeclaration: public Node {
     public:
+      virtual Node* clone(Node* node = NULL);
       virtual rope_t render(node_render_opts_t* opts) const;
   };
 
@@ -317,6 +358,7 @@ namespace fbjs {
   // NodeObjectLiteral
   class NodeObjectLiteral: public Node {
     public:
+      virtual Node* clone(Node* node = NULL);
       virtual rope_t render(node_render_opts_t* opts) const;
   };
 
@@ -324,6 +366,7 @@ namespace fbjs {
   // NodeObjectLiteralProperty
   class NodeObjectLiteralProperty: public Node {
     public:
+      virtual Node* clone(Node* node = NULL);
       virtual rope_t render(node_render_opts_t* opts) const;
   };
 
@@ -331,6 +374,7 @@ namespace fbjs {
   // NodeArrayLiteral
   class NodeArrayLiteral: public Node {
     public:
+      virtual Node* clone(Node* node = NULL);
       virtual rope_t render(node_render_opts_t* opts) const;
   };
 
@@ -341,6 +385,7 @@ namespace fbjs {
       bool isAssignment;
     public:
       NodeStaticMemberExpression();
+      virtual Node* clone(Node* node = NULL);
       virtual rope_t render(node_render_opts_t* opts) const;
       Node* identifier();
   };
@@ -352,6 +397,7 @@ namespace fbjs {
       bool isAssignment;
     public:
       NodeDynamicMemberExpression();
+      virtual Node* clone(Node* node = NULL);
       virtual rope_t render(node_render_opts_t* opts) const;
       Node* identifier();
   };
@@ -360,6 +406,7 @@ namespace fbjs {
   // NodeForLoop
   class NodeForLoop: public Node {
     public:
+      virtual Node* clone(Node* node = NULL);
       virtual rope_t render(node_render_opts_t* opts) const;
   };
 
@@ -367,6 +414,7 @@ namespace fbjs {
   // NodeForIn
   class NodeForIn: public Node {
     public:
+      virtual Node* clone(Node* node = NULL);
       virtual rope_t render(node_render_opts_t* opts) const;
   };
 
@@ -374,6 +422,7 @@ namespace fbjs {
   // NodeWhile
   class NodeWhile: public Node {
     public:
+      virtual Node* clone(Node* node = NULL);
       virtual rope_t render(node_render_opts_t* opts) const;
   };
 
@@ -381,6 +430,7 @@ namespace fbjs {
   // NodeDoWhile
   class NodeDoWhile: public Node {
     public:
+      virtual Node* clone(Node* node = NULL);
       virtual rope_t render(node_render_opts_t* opts) const;
   };
 }

@@ -40,12 +40,18 @@ Node* Node::clone(Node* node) {
 }
 
 Node* Node::appendChild(Node* node) {
+  if (node != NULL) {
+    node->_parentNode = this;
+  }
   this->_childNodes.push_back(node);
   return this;
 }
 
 Node* Node::removeChild(node_list_t::iterator node_pos) {
   Node* node = (*node_pos);
+  if (node != NULL) {
+    node->_parentNode = NULL;
+  }
   this->_childNodes.erase(node_pos);
   return node;
 }
@@ -56,6 +62,9 @@ Node* Node::replaceChild(Node* node, node_list_t::iterator node_pos) {
 }
 
 Node* Node::insertBefore(Node* node, node_list_t::iterator node_pos) {
+  if (node != NULL) {
+    node->_parentNode = this;
+  }
   this->_childNodes.insert(node_pos, node);
   return node;
 }
@@ -64,6 +73,9 @@ node_list_t& Node::childNodes() {
   return this->_childNodes;
 }
 
+Node* Node::parentNode() {
+  return this->_parentNode;
+}
 
 bool Node::empty() const {
   return this->_childNodes.empty();
@@ -95,6 +107,10 @@ Node* Node::identifier() {
 //
 // NodeBlock: a block of statements
 NodeBlock::NodeBlock() : braces(false) {}
+
+Node* NodeBlock::clone(Node* node) {
+  return Node::clone(new NodeBlock());
+}
 
 rope_t NodeBlock::render(node_render_opts_t* opts) const {
   rope_t ret;
@@ -130,10 +146,22 @@ NodeBlock* NodeBlock::requireBraces() {
 // NodeStatementList: a list of statements
 // note -- the difference between this and a block is that an empty statement_list will collapse into ""
 // whereas a block will collapse into ";" or "{}" depending on require_braces
+Node* NodeStatementList::clone(Node* node) {
+  return Node::clone(new NodeStatementList());
+}
+
 rope_t NodeStatementList::render(node_render_opts_t* opts) const {
-  rope_t ret = this->renderImplodeChildren(opts, ";") + ";";
+  rope_t ret = this->renderImplodeChildren(opts, ";");
   return ret;
 }
+
+Node* NodeStatementList::appendChild(Node* node) {
+  if (typeid(*node) != typeid(NodeEmptyExpression)) {
+    return Node::appendChild(node);
+  }
+  return this;
+}
+
 
 //
 // NodeNumericLiteral: it's a number. like 5. or 3.
@@ -204,6 +232,10 @@ Node* NodeBooleanLiteral::clone(Node* node) {
 
 //
 // NodeNullLiteral: null
+Node* NodeNullLiteral::clone(Node* node) {
+  return Node::clone(new NodeNullLiteral());
+}
+
 rope_t NodeNullLiteral::render(node_render_opts_t* opts) const {
   rope_t ret;
   ret += "null";
@@ -212,6 +244,10 @@ rope_t NodeNullLiteral::render(node_render_opts_t* opts) const {
 
 //
 // NodeThis: this
+Node* NodeThis::clone(Node* node) {
+  return Node::clone(new NodeThis());
+}
+
 rope_t NodeThis::render(node_render_opts_t* opts) const {
   rope_t ret;
   ret += "this";
@@ -220,6 +256,10 @@ rope_t NodeThis::render(node_render_opts_t* opts) const {
 
 //
 // NodeEmptyExpression
+Node* NodeEmptyExpression::clone(Node* node) {
+  return Node::clone(new NodeEmptyExpression());
+}
+
 rope_t NodeEmptyExpression::render(node_render_opts_t* opts) const {
   rope_t ret;
   return ret;
@@ -230,8 +270,7 @@ rope_t NodeEmptyExpression::render(node_render_opts_t* opts) const {
 NodeOperator::NodeOperator(node_operator_t op) : op(op) {}
 
 Node* NodeOperator::clone(Node* node) {
-  node = new NodeOperator(this->op);
-  return Node::clone(node);
+  return Node::clone(new NodeOperator(this->op));
 }
 
 rope_t NodeOperator::render(node_render_opts_t* opts) const {
@@ -340,6 +379,10 @@ rope_t NodeOperator::render(node_render_opts_t* opts) const {
 
 //
 // NodeConditionalExpression: true ? yes() : no()
+Node* NodeConditionalExpression::clone(Node* node) {
+  return Node::clone(new NodeConditionalExpression());
+}
+
 rope_t NodeConditionalExpression::render(node_render_opts_t* opts) const {
   rope_t ret;
   node_list_t::const_iterator node = this->_childNodes.begin();
@@ -354,6 +397,10 @@ rope_t NodeConditionalExpression::render(node_render_opts_t* opts) const {
 //
 // NodeParenthetical: an expression in ()'s. this is actually implicit in the AST, but we also make it an explicit
 // node. Otherwise, the renderer would have to be aware of operator precedence which would be cumbersome.
+Node* NodeParenthetical::clone(Node* node) {
+  return Node::clone(new NodeParenthetical());
+}
+
 rope_t NodeParenthetical::render(node_render_opts_t* opts) const {
   rope_t ret;
   ret += "(";
@@ -371,8 +418,7 @@ Node* NodeParenthetical::identifier() {
 NodeAssignment::NodeAssignment(node_assignment_t op) : op(op) {}
 
 Node* NodeAssignment::clone(Node* node) {
-  node = new NodeAssignment(this->op);
-  return Node::clone(node);
+  return Node::clone(new NodeAssignment(this->op));
 }
 
 rope_t NodeAssignment::render(node_render_opts_t* opts) const {
@@ -436,8 +482,7 @@ rope_t NodeAssignment::render(node_render_opts_t* opts) const {
 NodeUnary::NodeUnary(node_unary_t op) : op(op) {}
 
 Node* NodeUnary::clone(Node* node) {
-  node = new NodeUnary(this->op);
-  return Node::clone(node);
+  return Node::clone(new NodeUnary(this->op));
 }
 
 rope_t NodeUnary::render(node_render_opts_t* opts) const {
@@ -491,8 +536,7 @@ const node_assignment_t NodeAssignment::operatorType() {
 NodePostfix::NodePostfix(node_postfix_t op) : op(op) {}
 
 Node* NodePostfix::clone(Node* node) {
-  node = new NodePostfix(this->op);
-  return Node::clone(node);
+  return Node::clone(new NodePostfix(this->op));
 }
 
 rope_t NodePostfix::render(node_render_opts_t* opts) const {
@@ -514,8 +558,7 @@ rope_t NodePostfix::render(node_render_opts_t* opts) const {
 NodeIdentifier::NodeIdentifier(string name) : _name(name) {}
 
 Node* NodeIdentifier::clone(Node* node) {
-  node = new NodeIdentifier(this->_name);
-  return Node::clone(node);
+  return Node::clone(new NodeIdentifier(this->_name));
 }
 
 rope_t NodeIdentifier::render(node_render_opts_t* opts) const {
@@ -534,6 +577,10 @@ Node* NodeIdentifier::identifier() {
 
 //
 // NodeArgList: list of expressions for a function call or definition
+Node* NodeArgList::clone(Node* node) {
+  return Node::clone(new NodeArgList());
+}
+
 rope_t NodeArgList::render(node_render_opts_t* opts) const {
   rope_t ret;
   ret += "(";
@@ -544,6 +591,16 @@ rope_t NodeArgList::render(node_render_opts_t* opts) const {
 
 //
 // NodeFunction: a function definition
+NodeFunction::NodeFunction(bool declaration /* = false */) : _declaration(declaration) {}
+
+Node* NodeFunction::clone(Node* node) {
+  return Node::clone(new NodeFunction());
+}
+
+bool NodeFunction::declaration() const {
+  return this->_declaration;
+}
+
 rope_t NodeFunction::render(node_render_opts_t* opts) const {
   rope_t ret;
   node_list_t::const_iterator node = this->_childNodes.begin();
@@ -563,6 +620,10 @@ rope_t NodeFunction::render(node_render_opts_t* opts) const {
 
 //
 // NodeFunctionCall: foo(1). note: this does not cover new foo(1);
+Node* NodeFunctionCall::clone(Node* node) {
+  return Node::clone(new NodeFunctionCall());
+}
+
 rope_t NodeFunctionCall::render(node_render_opts_t* opts) const {
   rope_t ret;
   ret += this->_childNodes.front()->render(opts);
@@ -572,6 +633,10 @@ rope_t NodeFunctionCall::render(node_render_opts_t* opts) const {
 
 //
 // NodeFunctionConstructor: new foo(1)
+Node* NodeFunctionConstructor::clone(Node* node) {
+  return Node::clone(new NodeFunctionConstructor());
+}
+
 rope_t NodeFunctionConstructor::render(node_render_opts_t* opts) const {
   rope_t ret;
   ret += "new ";
@@ -582,6 +647,10 @@ rope_t NodeFunctionConstructor::render(node_render_opts_t* opts) const {
 
 //
 // NodeIf: if (true) { honk(dazzle); };
+Node* NodeIf::clone(Node* node) {
+  return Node::clone(new NodeIf());
+}
+
 rope_t NodeIf::render(node_render_opts_t* opts) const {
   rope_t ret;
   node_list_t::const_iterator node = this->_childNodes.begin();
@@ -599,6 +668,10 @@ rope_t NodeIf::render(node_render_opts_t* opts) const {
 
 //
 // NodeTry
+Node* NodeTry::clone(Node* node) {
+  return Node::clone(new NodeTry());
+}
+
 rope_t NodeTry::render(node_render_opts_t* opts) const {
   rope_t ret;
   node_list_t::const_iterator node = this->_childNodes.begin();
@@ -625,8 +698,7 @@ rope_t NodeTry::render(node_render_opts_t* opts) const {
 NodeStatementWithExpression::NodeStatementWithExpression(node_statement_with_expression_t statement) : statement(statement) {}
 
 Node* NodeStatementWithExpression::clone(Node* node) {
-  node = new NodeStatementWithExpression(this->statement);
-  return Node::clone(node);
+  return Node::clone(new NodeStatementWithExpression(this->statement));
 }
 
 rope_t NodeStatementWithExpression::render(node_render_opts_t* opts) const {
@@ -658,6 +730,10 @@ rope_t NodeStatementWithExpression::render(node_render_opts_t* opts) const {
 
 //
 // NodeLabel
+Node* NodeLabel::clone(Node* node) {
+  return Node::clone(new NodeLabel());
+}
+
 rope_t NodeLabel::render(node_render_opts_t* opts) const {
   rope_t ret;
   ret += this->_childNodes.front()->render(opts);
@@ -668,6 +744,10 @@ rope_t NodeLabel::render(node_render_opts_t* opts) const {
 
 //
 // NodeSwitch
+Node* NodeSwitch::clone(Node* node) {
+  return Node::clone(new NodeSwitch());
+}
+
 rope_t NodeSwitch::render(node_render_opts_t* opts) const {
   rope_t ret;
   ret += "switch(";
@@ -679,6 +759,10 @@ rope_t NodeSwitch::render(node_render_opts_t* opts) const {
 
 //
 // NodeDefaultClause: default: foo();
+Node* NodeDefaultClause::clone(Node* node) {
+  return Node::clone(new NodeDefaultClause());
+}
+
 rope_t NodeDefaultClause::render(node_render_opts_t* opts) const {
   rope_t ret;
   ret += "default:";
@@ -690,6 +774,10 @@ rope_t NodeDefaultClause::render(node_render_opts_t* opts) const {
 
 //
 // NodeCaseClause: case: bar();
+Node* NodeCaseClause::clone(Node* node) {
+  return Node::clone(new NodeCaseClause());
+}
+
 rope_t NodeCaseClause::render(node_render_opts_t* opts) const {
   rope_t ret;
   ret += "case ";
@@ -703,6 +791,10 @@ rope_t NodeCaseClause::render(node_render_opts_t* opts) const {
 
 //
 // NodeCaseClauseList: list of NodeCaseClause and NodeDefaultClause
+Node* NodeCaseClauseList::clone(Node* node) {
+  return Node::clone(new NodeCaseClauseList());
+}
+
 rope_t NodeCaseClauseList::render(node_render_opts_t* opts) const {
   rope_t ret;
   ret += "{";
@@ -713,6 +805,10 @@ rope_t NodeCaseClauseList::render(node_render_opts_t* opts) const {
 
 //
 // NodeVarDeclaration: a list of identifiers with optional assignments
+Node* NodeVarDeclaration::clone(Node* node) {
+  return Node::clone(new NodeVarDeclaration());
+}
+
 rope_t NodeVarDeclaration::render(node_render_opts_t* opts) const {
   rope_t ret;
   ret += "var ";
@@ -722,6 +818,10 @@ rope_t NodeVarDeclaration::render(node_render_opts_t* opts) const {
 
 //
 // NodeObjectLiteral
+Node* NodeObjectLiteral::clone(Node* node) {
+  return Node::clone(new NodeObjectLiteral());
+}
+
 rope_t NodeObjectLiteral::render(node_render_opts_t* opts) const {
   rope_t ret;
   ret += "{";
@@ -732,6 +832,10 @@ rope_t NodeObjectLiteral::render(node_render_opts_t* opts) const {
 
 //
 // NodeObjectLiteralProperty
+Node* NodeObjectLiteralProperty::clone(Node* node) {
+  return Node::clone(new NodeObjectLiteralProperty());
+}
+
 rope_t NodeObjectLiteralProperty::render(node_render_opts_t* opts) const {
   rope_t ret;
   ret += this->_childNodes.front()->render(opts);
@@ -742,6 +846,10 @@ rope_t NodeObjectLiteralProperty::render(node_render_opts_t* opts) const {
 
 //
 // NodeArrayLiteral
+Node* NodeArrayLiteral::clone(Node* node) {
+  return Node::clone(new NodeArrayLiteral());
+}
+
 rope_t NodeArrayLiteral::render(node_render_opts_t* opts) const {
   rope_t ret;
   ret += "[";
@@ -761,6 +869,10 @@ rope_t NodeStaticMemberExpression::render(node_render_opts_t* opts) const {
   return ret;
 }
 
+Node* NodeStaticMemberExpression::clone(Node* node) {
+  return Node::clone(new NodeStaticMemberExpression());
+}
+
 Node* NodeStaticMemberExpression::identifier() {
   this->isAssignment = true;
   return this;
@@ -769,6 +881,11 @@ Node* NodeStaticMemberExpression::identifier() {
 //
 // NodeDynamicMemberExpression: object access via foo['bar']
 NodeDynamicMemberExpression::NodeDynamicMemberExpression() : isAssignment(false) {}
+
+Node* NodeDynamicMemberExpression::clone(Node* node) {
+  return Node::clone(new NodeDynamicMemberExpression());
+}
+
 rope_t NodeDynamicMemberExpression::render(node_render_opts_t* opts) const {
   rope_t ret;
   ret += this->_childNodes.front()->render(opts);
@@ -785,6 +902,10 @@ Node* NodeDynamicMemberExpression::identifier() {
 
 //
 // NodeForLoop: only for(;;); loops, not for in
+Node* NodeForLoop::clone(Node* node) {
+  return Node::clone(new NodeForLoop());
+}
+
 rope_t NodeForLoop::render(node_render_opts_t* opts) const {
   rope_t ret;
   node_list_t::const_iterator node = this->_childNodes.begin();
@@ -801,6 +922,10 @@ rope_t NodeForLoop::render(node_render_opts_t* opts) const {
 
 //
 // NodeForIn
+Node* NodeForIn::clone(Node* node) {
+  return Node::clone(new NodeForIn());
+}
+
 rope_t NodeForIn::render(node_render_opts_t* opts) const {
   rope_t ret;
   node_list_t::const_iterator node = this->_childNodes.begin();
@@ -815,6 +940,10 @@ rope_t NodeForIn::render(node_render_opts_t* opts) const {
 
 //
 // NodeWhile
+Node* NodeWhile::clone(Node* node) {
+  return Node::clone(new NodeWhile());
+}
+
 rope_t NodeWhile::render(node_render_opts_t* opts) const {
   rope_t ret;
   ret += "while(";
@@ -826,6 +955,10 @@ rope_t NodeWhile::render(node_render_opts_t* opts) const {
 
 //
 // NodeDoWhile
+Node* NodeDoWhile::clone(Node* node) {
+  return Node::clone(new NodeDoWhile());
+}
+
 rope_t NodeDoWhile::render(node_render_opts_t* opts) const {
   rope_t ret;
   ret += "do ";

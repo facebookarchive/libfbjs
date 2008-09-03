@@ -1,13 +1,13 @@
 #pragma once
+#include <stdio.h>
 #include <stack>
 
 //#define DEBUG_BISON
 //#define DEBUG_FLEX
 
 #include "node.hpp"
-#include "fbjs.hpp"
 #include "parser.yacc.hpp"
-typedef struct {
+struct fbjs_parse_extra {
   list<string> errors;
   stack<int> paren_stack;
   stack<int> curly_stack;
@@ -16,7 +16,7 @@ typedef struct {
   int last_paren_tok;
   int last_curly_tok;
   int lineno;
-} fbjs_parse_extra;
+};
 #define YY_EXTRA_TYPE fbjs_parse_extra*
 #define YY_USER_INIT yylloc->first_line = 1
 
@@ -27,6 +27,7 @@ int yylex_destroy(void* scanner);
 YY_EXTRA_TYPE yyget_extra(void* scanner);
 void yyset_extra(YY_EXTRA_TYPE arbitrary_data, void* scanner);
 void yyset_debug(int bdebug, void* yyscanner);
+void yyrestart(FILE* input_file, void* yyscanner);
 
 // Yawn.
 int yyparse(void* yyscanner, Node* root);

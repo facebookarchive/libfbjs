@@ -28,6 +28,7 @@ int parsertok_(void*, int);
 %x DOT
 %x VIRTUAL_SEMICOLON
 %s NO_LINEBREAK
+%x REGEX
 FBJSBEGIN(IDENTIFIER);
 
 %%
@@ -45,7 +46,7 @@ FBJSBEGIN(IDENTIFIER);
 <*>{
   "//".*    |
   "<!--".*  |
-  [ \t\x0b\x0c\xa0]+  /* om nom nom */
+  [ \t\x0b\x0c\xa0]+ /* om nom nom */
   "/*" {
     char c;
     bool newline = false;
@@ -183,8 +184,30 @@ FBJSBEGIN(IDENTIFIER);
   yylval->string = strdup(yytext);
   return parsertok(t_IDENTIFIER);
 }
-'(\\.|\\[\n\r]|[^'])*'  |
-\"(\\.|\\[\n\r]|[^\"])*\" {
+'|\" {
+  // TODO: Figure out why the expression doesn't work :(
+/*
+-'(\\.|\\[\n\r]|[^'])*'  |
+-\"(\\.|\\[\n\r]|[^\"])*\" {
+*/
+  std::string str = yytext;
+  char c;
+  while ((c = yyinput(yyscanner)) != EOF) {
+    str += c;
+    if (c == yytext[0]) {
+      break;
+    } else if (c == '\\') {
+      c = yyinput(yyscanner);
+      if (c == EOF) {
+        NEVERMIND;
+        break;
+      }
+      str += c;
+    }
+  }
+  yylval->string = strdup(str.c_str());
+  return parsertok(t_STRING);
+
   /* TODO: check for line continuation
      var a = 'test \
      wat ';
@@ -192,8 +215,12 @@ FBJSBEGIN(IDENTIFIER);
   yylval->string = strdup(yytext);
   return parsertok(t_STRING);
 }
-<IDENTIFIER>\/[^*\/](\[([^\]\\]+|\\.)+\]|\\.|[^\/])*\/[A-Za-z]* {
-  yylval->string = strdup(yytext);
+<IDENTIFIER>"/" FBJSBEGIN(REGEX);
+<REGEX>(\[([^\]\\]+|\\.)+\]|\\.|[^\/\\])*"/"[A-Za-z]* {
+  size_t len = strlen(yytext);
+  yylval->string = (char*)malloc(len + 2);
+  yylval->string[0] = '/';
+  memcpy(yylval->string + 1, yytext, len + 1);
   return parsertok(t_REGEX);
 }
 "{" {
@@ -215,8 +242,13 @@ FBJSBEGIN(IDENTIFIER);
     NEVERMIND;
     return parsertok(t_VIRTUAL_SEMICOLON);
   }
-  yyextra->last_curly_tok = yyextra->curly_stack.top();
-  yyextra->curly_stack.pop();
+  if (yyextra->curly_stack.empty()) {
+    // This will ultimately yield a parse error...
+    yyextra->last_curly_tok = 0;
+  } else {
+    yyextra->last_curly_tok = yyextra->curly_stack.top();
+    yyextra->curly_stack.pop();
+  }
   return parsertok(t_RCURLY);
 }
 "(" {
