@@ -33,7 +33,7 @@ FBJSBEGIN(IDENTIFIER);
 
 %%
 <NO_LINEBREAK>{
-  [\n\r] {
+  \n {
     yylloc->first_line++;
     BEGIN(IDENTIFIER);
     return t_VIRTUAL_SEMICOLON;
@@ -46,7 +46,7 @@ FBJSBEGIN(IDENTIFIER);
 <*>{
   "//".*    |
   "<!--".*  |
-  [ \t\x0b\x0c\xa0]+ /* om nom nom */
+  [ \t\x0b\x0c\xa0\r]+ /* om nom nom */
   "/*" {
     char c;
     bool newline = false;
@@ -112,7 +112,7 @@ FBJSBEGIN(IDENTIFIER);
       return t_VIRTUAL_SEMICOLON;
     }
   }
-  [\n\r] {
+  \n {
     yylloc->first_line++;
   }
   . {
@@ -306,7 +306,7 @@ FBJSBEGIN(IDENTIFIER);
 "!"    return parsertok(t_NOT);
 "~"    return parsertok(t_BIT_NOT);
 "="    return parsertok(t_ASSIGN);
-[\n\r] {
+\n {
   yylloc->first_line++;
   if (yyextra->last_tok == t_IDENTIFIER || yyextra->last_tok == t_NUMBER || yyextra->last_tok == t_STRING ||
     yyextra->last_tok == t_REGEX || yyextra->last_tok == t_TRUE || yyextra->last_tok == t_FALSE ||

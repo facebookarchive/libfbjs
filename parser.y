@@ -84,8 +84,8 @@ void yyerror(YYLTYPE* yyloc, void* yyscanner, void* node, const char* str) {
 
 %start program
 
-%type<node> literal null_literal boolean_literal numeric_literal regex_literal string_literal primary_expression array_literal element_list object_literal property_name_and_value_list property_name member_expression new_expression call_expression arguments argument_list left_hand_side_expression postfix_expression unary_expression multiplicative_expression additive_expression shift_expression relational_expression relational_expression_no_in equality_expression equality_expression_no_in bitwise_and_expression bitwise_and_expression_no_in bitwise_xor_expression bitwise_xor_expression_no_in bitwise_or_expression bitwise_or_expression_no_in logical_and_expression logical_and_expression_no_in logical_or_expression logical_or_expression_no_in conditional_expression conditional_expression_no_in assignment_expression assignment_expression_no_in expression expression_opt expression_no_in_opt expression_no_in statement block statement_list source_element variable_statement variable_declaration_list variable_declaration_list_no_in variable_declaration variable_declaration_no_in initializer initializer_no_in empty_statement expression_statement if_statement iteration_statement continue_statement break_statement return_statement with_statement switch_statement case_block case_clause case_clauses_with_default case_clauses_no_default default_clause labelled_statement throw_statement try_statement finally function_expression function_declaration formal_parameter_list identifier function_body
-%type<duple> catch
+%type<node> literal null_literal boolean_literal numeric_literal regex_literal string_literal primary_expression array_literal element_list object_literal property_name_and_value_list property_name member_expression new_expression call_expression arguments argument_list left_hand_side_expression postfix_expression unary_expression multiplicative_expression additive_expression shift_expression relational_expression relational_expression_no_in equality_expression equality_expression_no_in bitwise_and_expression bitwise_and_expression_no_in bitwise_xor_expression bitwise_xor_expression_no_in bitwise_or_expression bitwise_or_expression_no_in logical_and_expression logical_and_expression_no_in logical_or_expression logical_or_expression_no_in conditional_expression conditional_expression_no_in assignment_expression assignment_expression_no_in expression expression_opt expression_no_in_opt expression_no_in statement block statement_list source_element variable_statement variable_declaration_list variable_declaration_list_no_in variable_declaration variable_declaration_no_in initializer initializer_no_in empty_statement expression_statement if_statement iteration_statement continue_statement break_statement return_statement with_statement switch_statement case_block case_clauses_with_default case_clauses_no_default labelled_statement throw_statement try_statement finally function_expression function_declaration formal_parameter_list identifier function_body
+%type<duple> catch case_clause default_clause
 %type<assignment> assignment_operator
 %type<integer> elison
 %%
@@ -664,9 +664,6 @@ statement:
 |   switch_statement
 |   throw_statement
 |   try_statement
-|   error t_SEMICOLON {
-      $$ = new NodeEmptyExpression();
-    }
 ;
 
 block:
@@ -766,7 +763,7 @@ iteration_statement:
       $$ = (new NodeForIn())->appendChild($3)->appendChild($5)->appendChild($7);
     }
 |   t_FOR t_LPAREN t_VAR variable_declaration_list_no_in t_IN expression t_RPAREN statement {
-      $$ = (new NodeForIn())->appendChild($4)->appendChild($6)->appendChild($8);
+      $$ = (new NodeForIn())->appendChild(static_cast<NodeVarDeclaration*>($4)->setIterator(true))->appendChild($6)->appendChild($8);
     }
 ;
 
@@ -799,7 +796,7 @@ return_statement:
 
 with_statement:
     t_WITH t_LPAREN expression t_RPAREN statement {
-      parsererror("wat.");
+      parsererror("with(){} statements are not supported.");
     }
 ;
 
@@ -823,37 +820,53 @@ case_block:
 
 case_clauses_with_default:
     case_clauses_no_default default_clause {
-      $$ = $1->appendChild($2);
+      $$ = $1->appendChild($2[0]);
+      if ($2[1] != NULL) {
+        $$->appendChild($2[1]);
+      }
     }
 |   default_clause {
-      $$ = (new NodeCaseClause())->appendChild($1);
+      $$ = (new NodeCaseClause())->appendChild($1[0]);
+      if ($1[1] != NULL) {
+        $$->appendChild($1[1]);
+      }
     }
 ;
 
 case_clauses_no_default:
     case_clause {
-      $$ = (new NodeCaseClauseList())->appendChild($1);
+      $$ = (new NodeCaseClauseList())->appendChild($1[0]);
+      if ($1[1] != NULL) {
+        $$->appendChild($1[1]);
+      }
     }
 |   case_clauses_no_default case_clause {
-      $$ = $1->appendChild($2);
+      $$ = $1->appendChild($2[0]);
+      if ($2[1] != NULL) {
+        $$->appendChild($2[1]);
+      }
     }
 ;
 
 case_clause:
     t_CASE expression t_COLON statement_list {
-      $$ = (new NodeCaseClause())->appendChild($2)->appendChild($4);
+      $$[0] = (new NodeCaseClause())->appendChild($2);
+      $$[1] = $4;
     }
 |   t_CASE expression t_COLON {
-      $$ = (new NodeCaseClause())->appendChild($2)->appendChild(NULL);
+      $$[0] = (new NodeCaseClause())->appendChild($2);
+      $$[1] = NULL;
     }
 ;
 
 default_clause:
     t_DEFAULT t_COLON statement_list {
-      $$ = (new NodeDefaultClause())->appendChild($3);
+      $$[0] = (new NodeDefaultClause());
+      $$[1] = $3;
     }
 |   t_DEFAULT t_COLON {
-      $$ = (new NodeDefaultClause())->appendChild(NULL);
+      $$[0] = (new NodeDefaultClause());
+      $$[1] = NULL;
     }
 ;
 
