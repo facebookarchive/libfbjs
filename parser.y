@@ -102,10 +102,21 @@ semicolon:
 
 statement_list:
     source_element {
-      $$ = (new NodeStatementList())->appendChild($1);
+      // Silly hack since my awesome lexer sticks `t_VIRTUAL_SEMICOLON's all over the place which ends up creating tons of `NodeEmptyExpression's
+      if (dynamic_cast<NodeEmptyExpression*>($1) == NULL) {
+        $$ = (new NodeStatementList())->appendChild($1);
+      } else {
+        delete $1;
+        $$ = new NodeStatementList();
+      }
     }
 |   statement_list source_element {
-      $$ = $1->appendChild($2);
+      $$ = $1;
+      if (dynamic_cast<NodeEmptyExpression*>($2) == NULL) {
+        $$->appendChild($2);
+      } else {
+        delete $2;
+      }
     }
 ;
 
@@ -668,10 +679,10 @@ statement:
 
 block:
     t_LCURLY statement_list t_RCURLY {
-      $$ = (new NodeBlock())->appendChild($2);
+      $$ = $2;
     }
 |   t_LCURLY t_RCURLY {
-      $$ = (new NodeBlock())->appendChild(new NodeStatementList());
+      $$ = new NodeStatementList();
     }
 ;
 
@@ -814,7 +825,7 @@ case_block:
       $$ = $2;
     }
 |   t_LCURLY t_RCURLY {
-      $$ = new NodeCaseClauseList();
+      $$ = new NodeStatementList();
     }
 ;
 
@@ -835,7 +846,7 @@ case_clauses_with_default:
 
 case_clauses_no_default:
     case_clause {
-      $$ = (new NodeCaseClauseList())->appendChild($1[0]);
+      $$ = (new NodeStatementList())->appendChild($1[0]);
       if ($1[1] != NULL) {
         $$->appendChild($1[1]);
       }

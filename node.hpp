@@ -12,116 +12,121 @@ typedef __gnu_cxx::rope<char> rope_t;
 namespace fbjs {
   class Node;
   typedef list<Node*> node_list_t;
-  typedef struct {
-    bool indentation;
-    int pretty;
-  } node_render_opts_t;
+  typedef enum {
+    RENDER_NONE = 0,
+    RENDER_PRETTY = 1,
+  } node_render_enum;
+  struct render_guts_t {
+    int lineno;
+    bool pretty;
+  };
 
   //
   // Node
   class Node {
     protected:
       node_list_t _childNodes;
-      Node* _parentNode;
+      virtual rope_t renderImplodeChildren(render_guts_t* guts, int indentation, const char* glue) const;
 
     public:
       Node();
+      Node(const char* code);
+      Node(FILE* file);
       virtual ~Node();
-      virtual Node* clone(Node* node = NULL);
+      virtual Node* clone(Node* node = NULL) const;
 
       virtual Node* identifier();
       bool empty() const;
 
-      node_list_t& childNodes();
-      Node* parentNode();
-      virtual Node* appendChild(Node* node);
+      node_list_t& Node::childNodes();
+      Node* appendChild(Node* node);
       Node* removeChild(node_list_t::iterator node_pos);
       Node* replaceChild(Node* node, node_list_t::iterator node_pos);
       Node* insertBefore(Node* node, node_list_t::iterator node_pos);
 
-      virtual rope_t render(node_render_opts_t* opts) const;
-      virtual rope_t renderImplodeChildren(node_render_opts_t* opts, const char* glue) const;
-  };
-
-  //
-  // NodeBlock
-  class NodeBlock: public Node {
-    protected:
-      bool braces;
-
-    public:
-      NodeBlock();
-      virtual Node* clone(Node* node = NULL);
-      virtual rope_t render(node_render_opts_t* opts) const;
-      NodeBlock* requireBraces();
+      virtual rope_t render(node_render_enum opts = RENDER_NONE) const;
+      virtual rope_t render(render_guts_t* guts, int indentation) const;
+      virtual rope_t renderBlock(bool must, render_guts_t* guts, int indentation) const;
+      virtual rope_t renderStatement(render_guts_t* guts, int indentation) const;
+      virtual rope_t renderIndentedStatement(render_guts_t* guts, int indentation) const;
   };
 
   //
   // NodeStatementList
   class NodeStatementList: public Node {
     public:
-      virtual Node* clone(Node* node = NULL);
-      virtual rope_t render(node_render_opts_t* opts) const;
-      virtual Node* appendChild(Node* node);
+      virtual Node* clone(Node* node = NULL) const;
+      virtual rope_t render(render_guts_t* guts, int indentation) const;
+      virtual rope_t renderBlock(bool must, render_guts_t* guts, int indentation) const;
+      virtual rope_t renderStatement(render_guts_t* guts, int indentation) const;
+      virtual rope_t renderIndentedStatement(render_guts_t* guts, int indentation) const;
   };
 
+  //
+  // NodeExpression (abstract)
+  class NodeExpression: public Node {
+    public:
+      virtual rope_t render(render_guts_t* guts, int indentation) const = 0;
+      virtual rope_t renderStatement(render_guts_t* guts, int indentation) const;
+  };
 
   //
   // NodeNumericLiteral
-  class NodeNumericLiteral: public Node {
+  class NodeNumericLiteral: public NodeExpression {
     protected:
       double value;
     public:
       NodeNumericLiteral(double value);
-      virtual Node* clone(Node* node = NULL);
-      virtual rope_t render(node_render_opts_t* opts) const;
+      virtual Node* clone(Node* node = NULL) const;
+      virtual rope_t render(render_guts_t* guts, int indentation) const;
   };
 
   //
   // NodeStringLiteral
-  class NodeStringLiteral: public Node {
+  class NodeStringLiteral: public NodeExpression {
     protected:
       string value;
       bool quoted;
     public:
       NodeStringLiteral(string value, bool quoted);
-      virtual Node* clone(Node* node = NULL);
-      virtual rope_t render(node_render_opts_t* opts) const;
+      virtual Node* clone(Node* node = NULL) const;
+      virtual rope_t render(render_guts_t* guts, int indentation) const;
   };
 
   //
   // NodeBooleanLiteral
-  class NodeBooleanLiteral: public Node {
+  class NodeBooleanLiteral: public NodeExpression {
     protected:
       bool value;
     public:
       NodeBooleanLiteral(bool value);
-      virtual Node* clone(Node* node = NULL);
-      virtual rope_t render(node_render_opts_t* opts) const;
+      virtual Node* clone(Node* node = NULL) const;
+      virtual rope_t render(render_guts_t* guts, int indentation) const;
   };
 
   //
   // NodeNullLiteral
-  class NodeNullLiteral: public Node {
+  class NodeNullLiteral: public NodeExpression {
     public:
-      virtual Node* clone(Node* node = NULL);
-      virtual rope_t render(node_render_opts_t* opts) const;
+      virtual Node* clone(Node* node = NULL) const;
+      virtual rope_t render(render_guts_t* guts, int indentation) const;
   };
 
   //
   // NodeThis
-  class NodeThis: public Node {
+  class NodeThis: public NodeExpression {
     public:
-      virtual Node* clone(Node* node = NULL);
-      virtual rope_t render(node_render_opts_t* opts) const;
+      virtual Node* clone(Node* node = NULL) const;
+      virtual rope_t render(render_guts_t* guts, int indentation) const;
   };
 
   //
   // NodeEmptyExpression
-  class NodeEmptyExpression: public Node {
+  class NodeEmptyExpression: public NodeExpression {
     public:
-      virtual Node* clone(Node* node = NULL);
-      virtual rope_t render(node_render_opts_t* opts) const;
+      virtual Node* clone(Node* node = NULL) const;
+      virtual rope_t render(render_guts_t* guts, int indentation) const;
+      virtual rope_t renderBlock(bool must, render_guts_t* guts, int indentation) const;
   };
 
   //
@@ -136,29 +141,29 @@ namespace fbjs {
     // Other.
     IN, INSTANCEOF
   } node_operator_t;
-  class NodeOperator: public Node {
+  class NodeOperator: public NodeExpression {
     protected:
       node_operator_t op;
     public:
       NodeOperator(node_operator_t op);
-      virtual Node* clone(Node* node = NULL);
-      virtual rope_t render(node_render_opts_t* opts) const;
+      virtual Node* clone(Node* node = NULL) const;
+      virtual rope_t render(render_guts_t* guts, int indentation) const;
   };
 
   //
   // NodeConditionalExpression
-  class NodeConditionalExpression: public Node {
+  class NodeConditionalExpression: public NodeExpression {
     public:
-      virtual Node* clone(Node* node = NULL);
-      virtual rope_t render(node_render_opts_t* opts) const;
+      virtual Node* clone(Node* node = NULL) const;
+      virtual rope_t render(render_guts_t* guts, int indentation) const;
   };
 
   //
   // NodeParenthetical
-  class NodeParenthetical: public Node {
+  class NodeParenthetical: public NodeExpression {
     public:
-      virtual Node* clone(Node* node = NULL);
-      virtual rope_t render(node_render_opts_t* opts) const;
+      virtual Node* clone(Node* node = NULL) const;
+      virtual rope_t render(render_guts_t* guts, int indentation) const;
       virtual Node* identifier();
   };
 
@@ -170,14 +175,14 @@ namespace fbjs {
     LSHIFT_ASSIGN, RSHIFT_ASSIGN, RSHIFT3_ASSIGN,
     BIT_AND_ASSIGN, BIT_XOR_ASSIGN, BIT_OR_ASSIGN
   } node_assignment_t;
-  class NodeAssignment: public Node {
+  class NodeAssignment: public NodeExpression {
     protected:
       node_assignment_t op;
     public:
       NodeAssignment(node_assignment_t op);
-      virtual Node* clone(Node* node = NULL);
-      virtual rope_t render(node_render_opts_t* opts) const;
-      const node_assignment_t operatorType();
+      virtual Node* clone(Node* node = NULL) const;
+      virtual rope_t render(render_guts_t* guts, int indentation) const;
+      const node_assignment_t operatorType() const;
   };
 
   //
@@ -188,13 +193,13 @@ namespace fbjs {
     BIT_NOT_UNARY,
     NOT_UNARY
   } node_unary_t;
-  class NodeUnary: public Node {
+  class NodeUnary: public NodeExpression {
     protected:
       node_unary_t op;
     public:
       NodeUnary(node_unary_t op);
-      virtual Node* clone(Node* node = NULL);
-      virtual rope_t render(node_render_opts_t* opts) const;
+      virtual Node* clone(Node* node = NULL) const;
+      virtual rope_t render(render_guts_t* guts, int indentation) const;
   };
 
   //
@@ -202,34 +207,117 @@ namespace fbjs {
   typedef enum {
     INCR_POSTFIX, DECR_POSTFIX
   } node_postfix_t;
-  class NodePostfix: public Node {
+  class NodePostfix: public NodeExpression {
     protected:
       node_postfix_t op;
     public:
       NodePostfix(node_postfix_t op);
-      virtual Node* clone(Node* node = NULL);
-      virtual rope_t render(node_render_opts_t* opts) const;
+      virtual Node* clone(Node* node = NULL) const;
+      virtual rope_t render(render_guts_t* guts, int indentation) const;
   };
 
   //
   // NodeIdentifier
-  class NodeIdentifier: public Node {
+  class NodeIdentifier: public NodeExpression {
     protected:
       string _name;
     public:
       NodeIdentifier(string name);
-      virtual Node* clone(Node* node = NULL);
-      virtual rope_t render(node_render_opts_t* opts) const;
+      virtual Node* clone(Node* node = NULL) const;
+      virtual rope_t render(render_guts_t* guts, int indentation) const;
       virtual string name() const;
       virtual Node* identifier();
   };
 
   //
-  // NodeArgList
-  class NodeArgList: public Node {
+  // NodeFunctionCall
+  class NodeFunctionCall: public NodeExpression {
     public:
-      virtual Node* clone(Node* node = NULL);
-      virtual rope_t render(node_render_opts_t* opts) const;
+      virtual rope_t render(render_guts_t* guts, int indentation) const;
+      virtual Node* clone(Node* node = NULL) const;
+  };
+
+  //
+  // NodeFunctionConstructor
+  class NodeFunctionConstructor: public NodeExpression {
+    public:
+      virtual Node* clone(Node* node = NULL) const;
+      virtual rope_t render(render_guts_t* guts, int indentation) const;
+  };
+
+  //
+  // NodeObjectLiteral
+  class NodeObjectLiteral: public NodeExpression {
+    public:
+      virtual Node* clone(Node* node = NULL) const;
+      virtual rope_t render(render_guts_t* guts, int indentation) const;
+  };
+
+  //
+  // NodeArrayLiteral
+  class NodeArrayLiteral: public NodeExpression {
+    public:
+      virtual Node* clone(Node* node = NULL) const;
+      virtual rope_t render(render_guts_t* guts, int indentation) const;
+  };
+
+  //
+  // NodeStaticMemberExpression
+  class NodeStaticMemberExpression: public NodeExpression {
+    protected:
+      bool isAssignment;
+    public:
+      NodeStaticMemberExpression();
+      virtual Node* clone(Node* node = NULL) const;
+      virtual rope_t render(render_guts_t* guts, int indentation) const;
+      Node* identifier();
+  };
+
+  //
+  // NodeDynamicMemberExpression
+  class NodeDynamicMemberExpression: public NodeExpression {
+    protected:
+      bool isAssignment;
+    public:
+      NodeDynamicMemberExpression();
+      virtual Node* clone(Node* node = NULL) const;
+      virtual rope_t render(render_guts_t* guts, int indentation) const;
+      Node* identifier();
+  };
+
+  //
+  // NodeStatement (abstract)
+  class NodeStatement: public Node {
+    public:
+      virtual rope_t render(render_guts_t* guts, int indentation) const = 0;
+      virtual rope_t renderStatement(render_guts_t* guts, int indentation) const;
+  };
+
+  //
+  // NodeStatementWithExpression
+  typedef enum {
+    RETURN, CONTINUE, BREAK, THROW
+  } node_statement_with_expression_t;
+  class NodeStatementWithExpression: public NodeStatement {
+    protected:
+      node_statement_with_expression_t statement;
+    public:
+      NodeStatementWithExpression(node_statement_with_expression_t statement);
+      virtual Node* clone(Node* node = NULL) const;
+      virtual rope_t render(render_guts_t* guts, int indentation) const;
+  };
+
+  //
+  // NodeVarDeclaration
+  class NodeVarDeclaration: public NodeStatement {
+    protected:
+      bool _iterator;
+    public:
+      NodeVarDeclaration(bool iterator = false);
+      virtual Node* clone(Node* node = NULL) const;
+      virtual rope_t render(render_guts_t* guts, int indentation) const;
+      bool iterator() const;
+      Node* NodeVarDeclaration::setIterator(bool iterator);
   };
 
   //
@@ -239,198 +327,122 @@ namespace fbjs {
       bool _declaration;
     public:
       NodeFunction(bool declaration = false);
-      virtual Node* clone(Node* node = NULL);
-      virtual bool declaration() const;
-      virtual rope_t render(node_render_opts_t* opts) const;
+      virtual Node* clone(Node* node = NULL) const;
+      virtual rope_t render(render_guts_t* guts, int indentation) const;
+      bool declaration() const;
   };
 
   //
-  // NodeFunctionCall
-  class NodeFunctionCall: public Node {
+  // NodeArgList
+  class NodeArgList: public Node {
     public:
-      virtual rope_t render(node_render_opts_t* opts) const;
-      virtual Node* clone(Node* node = NULL);
-  };
-
-  //
-  // NodeFunctionConstructor
-  class NodeFunctionConstructor: public Node {
-    public:
-      virtual Node* clone(Node* node = NULL);
-      virtual rope_t render(node_render_opts_t* opts) const;
+      virtual Node* clone(Node* node = NULL) const;
+      virtual rope_t render(render_guts_t* guts, int indentation) const;
   };
 
   //
   // NodeIf
   class NodeIf: public Node {
     public:
-      virtual Node* clone(Node* node = NULL);
-      virtual rope_t render(node_render_opts_t* opts) const;
+      virtual Node* clone(Node* node = NULL) const;
+      virtual rope_t render(render_guts_t* guts, int indentation) const;
   };
 
   //
   // NodeTry
   class NodeTry: public Node {
     public:
-      virtual Node* clone(Node* node = NULL);
-      virtual rope_t render(node_render_opts_t* opts) const;
-  };
-
-  //
-  // NodeStatementWithExpression
-  typedef enum {
-    RETURN, CONTINUE, BREAK, THROW
-  } node_statement_with_expression_t;
-  class NodeStatementWithExpression: public Node {
-    protected:
-      node_statement_with_expression_t statement;
-    public:
-      NodeStatementWithExpression(node_statement_with_expression_t statement);
-      virtual Node* clone(Node* node = NULL);
-      virtual rope_t render(node_render_opts_t* opts) const;
+      virtual Node* clone(Node* node = NULL) const;
+      virtual rope_t render(render_guts_t* guts, int indentation) const;
   };
 
   //
   // NodeLabel
   class NodeLabel: public Node {
     public:
-      virtual Node* clone(Node* node = NULL);
-      virtual rope_t render(node_render_opts_t* opts) const;
+      virtual Node* clone(Node* node = NULL) const;
+      virtual rope_t render(render_guts_t* guts, int indentation) const;
   };
 
   //
   // NodeCaseClause
   class NodeCaseClause: public Node {
     public:
-      virtual Node* clone(Node* node = NULL);
-      virtual rope_t render(node_render_opts_t* opts) const;
-  };
-
-  //
-  // NodeCaseClauseList
-  class NodeCaseClauseList: public Node {
-    public:
-      virtual Node* clone(Node* node = NULL);
-      virtual rope_t render(node_render_opts_t* opts) const;
+      virtual Node* clone(Node* node = NULL) const;
+      virtual rope_t render(render_guts_t* guts, int indentation) const;
+      virtual rope_t renderStatement(render_guts_t* guts, int indentation) const;
+      virtual rope_t renderIndentedStatement(render_guts_t* guts, int indentation) const;
   };
 
   //
   // NodeSwitch
   class NodeSwitch: public Node {
     public:
-      virtual Node* clone(Node* node = NULL);
-      virtual rope_t render(node_render_opts_t* opts) const;
+      virtual Node* clone(Node* node = NULL) const;
+      virtual rope_t render(render_guts_t* guts, int indentation) const;
   };
 
   //
   // NodeDefaultClause
-  class NodeDefaultClause: public Node {
+  class NodeDefaultClause: public NodeCaseClause {
     public:
-      virtual Node* clone(Node* node = NULL);
-      virtual rope_t render(node_render_opts_t* opts) const;
+      virtual Node* clone(Node* node = NULL) const;
+      virtual rope_t render(render_guts_t* guts, int indentation) const;
   };
 
   //
   // NodeCauseClause
   class NodeCauseClause: public Node {
     public:
-      virtual Node* clone(Node* node = NULL);
-      virtual rope_t render(node_render_opts_t* opts) const;
+      virtual Node* clone(Node* node = NULL) const;
+      virtual rope_t render(render_guts_t* guts, int indentation) const;
   };
 
   //
   // NodeCauseClauseList
   class NodeCauseClauseList: public Node {
     public:
-      virtual Node* clone(Node* node = NULL);
-      virtual rope_t render(node_render_opts_t* opts) const;
-  };
-
-  //
-  // NodeVarDeclaration
-  class NodeVarDeclaration: public Node {
-    public:
-      virtual Node* clone(Node* node = NULL);
-      virtual rope_t render(node_render_opts_t* opts) const;
-  };
-
-  //
-  // NodeObjectLiteral
-  class NodeObjectLiteral: public Node {
-    public:
-      virtual Node* clone(Node* node = NULL);
-      virtual rope_t render(node_render_opts_t* opts) const;
+      virtual Node* clone(Node* node = NULL) const;
+      virtual rope_t render(render_guts_t* guts, int indentation) const;
   };
 
   //
   // NodeObjectLiteralProperty
   class NodeObjectLiteralProperty: public Node {
     public:
-      virtual Node* clone(Node* node = NULL);
-      virtual rope_t render(node_render_opts_t* opts) const;
-  };
-
-  //
-  // NodeArrayLiteral
-  class NodeArrayLiteral: public Node {
-    public:
-      virtual Node* clone(Node* node = NULL);
-      virtual rope_t render(node_render_opts_t* opts) const;
-  };
-
-  //
-  // NodeStaticMemberExpression
-  class NodeStaticMemberExpression: public Node {
-    protected:
-      bool isAssignment;
-    public:
-      NodeStaticMemberExpression();
-      virtual Node* clone(Node* node = NULL);
-      virtual rope_t render(node_render_opts_t* opts) const;
-      Node* identifier();
-  };
-
-  //
-  // NodeDynamicMemberExpression
-  class NodeDynamicMemberExpression: public Node {
-    protected:
-      bool isAssignment;
-    public:
-      NodeDynamicMemberExpression();
-      virtual Node* clone(Node* node = NULL);
-      virtual rope_t render(node_render_opts_t* opts) const;
-      Node* identifier();
+      virtual Node* clone(Node* node = NULL) const;
+      virtual rope_t render(render_guts_t* guts, int indentation) const;
   };
 
   //
   // NodeForLoop
   class NodeForLoop: public Node {
     public:
-      virtual Node* clone(Node* node = NULL);
-      virtual rope_t render(node_render_opts_t* opts) const;
+      virtual Node* clone(Node* node = NULL) const;
+      virtual rope_t render(render_guts_t* guts, int indentation) const;
   };
 
   //
   // NodeForIn
   class NodeForIn: public Node {
     public:
-      virtual Node* clone(Node* node = NULL);
-      virtual rope_t render(node_render_opts_t* opts) const;
+      virtual Node* clone(Node* node = NULL) const;
+      virtual rope_t render(render_guts_t* guts, int indentation) const;
   };
 
   //
   // NodeWhile
   class NodeWhile: public Node {
     public:
-      virtual Node* clone(Node* node = NULL);
-      virtual rope_t render(node_render_opts_t* opts) const;
+      virtual Node* clone(Node* node = NULL) const;
+      virtual rope_t render(render_guts_t* guts, int indentation) const;
   };
 
   //
   // NodeDoWhile
-  class NodeDoWhile: public Node {
+  class NodeDoWhile: public NodeStatement {
     public:
-      virtual Node* clone(Node* node = NULL);
-      virtual rope_t render(node_render_opts_t* opts) const;
+      virtual Node* clone(Node* node = NULL) const;
+      virtual rope_t render(render_guts_t* guts, int indentation) const;
   };
 }
