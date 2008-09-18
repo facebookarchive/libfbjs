@@ -16,7 +16,7 @@ int main(int argc, char* argv[]) {
         try {
           resources.push_back(externalize(parseresource(argv[i])));
         } catch (string error) {
-          cout<<"Error parsing "<<argv[i]<<": "<<error<<"\n";
+          cout << "Error parsing " << argv[i] << ": " << error << "\n";
           return 1;
         }
       }
@@ -28,7 +28,7 @@ int main(int argc, char* argv[]) {
         try {
           prelude.push_back(parseresource(argv[i]));
         } catch (string error) {
-          cout<<"Error parsing "<<argv[i]<<": "<<error<<"\n";
+          cout << "Error parsing " << argv[i] << ": " << error << "\n";
           return 1;
         }
       }
@@ -43,7 +43,7 @@ int main(int argc, char* argv[]) {
 
     // Eh...
     } else {
-      cout<<"Unknown parameter: "<<argv[i]<<"\n";
+      cout << "Unknown parameter: " << argv[i] << "\n";
       return 1;
     }
   }
@@ -88,10 +88,7 @@ int main(int argc, char* argv[]) {
     ->appendChild(new NodeArgList());
 
   // Render it out and quit
-  node_render_opts_t render_opts;
-  render_opts.indentation = 0;
-  render_opts.pretty = true;
-  cout<<root->render(&render_opts).c_str();
+  cout << root->render(RENDER_PRETTY).c_str();
   delete root;
   return 0;
 }
@@ -101,23 +98,8 @@ Node* parseresource(char* filename) {
   if (!file) {
     throw string("Failed to open: ")+filename;
   }
-  Node* root = new Node();
-  void* scanner;
-  fbjs_parse_extra extra;
-
-  yylex_init_extra(&extra, &scanner);
-  extra.lineno = 1;
-  extra.last_tok = 0;
-  extra.last_paren_tok = 0;
-  yyrestart(file, scanner);
-  yyparse(scanner, root);
-  yylex_destroy(scanner);
+  Node* root = new Node(file);
   fclose(file);
-
-  if (!extra.errors.empty()) {
-    delete root;
-    throw extra.errors.front();
-  }
   return root;
 }
 

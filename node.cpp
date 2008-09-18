@@ -660,14 +660,14 @@ rope_t NodeTry::render(render_guts_t* guts, int indentation) const {
   ret += "try";
   ret += (*node)->renderBlock(true, guts, indentation);
   if (*++node != NULL) {
-    ret += "catch(";
+    ret += (guts->pretty ? " catch (" : "catch(");
     ret += (*node)->render(guts, indentation) + ")";
     ret += (*++node)->renderBlock(true, guts, indentation);
   } else {
     node++;
   }
   if (*++node != NULL) {
-    ret += "finally";
+    ret += (guts->pretty ? " finally" : "finally");
     ret += (*node)->renderBlock(true, guts, indentation);
   }
   return ret;
@@ -861,7 +861,7 @@ rope_t NodeForLoop::render(render_guts_t* guts, int indentation) const {
   ret += (*node)->render(guts, indentation) + (guts->pretty ? "; " : ";");
   ret += (*++node)->render(guts, indentation) + (guts->pretty ? "; " : ";");
   ret += (*++node)->render(guts, indentation) + ")";
-  ret +=  (*++node)->renderBlock(false, guts, indentation);
+  ret += (*++node)->renderBlock(false, guts, indentation);
   return ret;
 }
 
