@@ -4,7 +4,7 @@ using namespace fbjs;
 //
 // Node: All other node inherit from this. There should only be one instance
 //       a Node -- the root node.
-Node::Node() {}
+Node::Node(const unsigned int lineno /* = 0 */) : _lineno(lineno) {}
 
 Node::~Node() {
 
@@ -54,8 +54,13 @@ bool Node::empty() const {
 }
 
 rope_t Node::render(node_render_enum opts /* = RENDER_NONE */) const {
+  return this->render((int)opts);
+}
+
+rope_t Node::render(int opts) const {
   render_guts_t guts;
   guts.pretty = opts & RENDER_PRETTY;
+  guts.sanelineno = opts & RENDER_MAINTAIN_LINENO;
   guts.lineno = 1;
   return this->render(&guts, 0);
 }
@@ -65,17 +70,30 @@ rope_t Node::render(render_guts_t* guts, int indentation) const {
 }
 
 rope_t Node::renderBlock(bool must, render_guts_t* guts, int indentation) const {
-  if (!must && this->_childNodes.empty()) {
+  if (!must && this->empty()) {
     return rope_t(";");
   } else if (!must && !guts->pretty && this->_childNodes.front() == this->_childNodes.back()) {
-    return this->_childNodes.front()->renderStatement(guts, indentation);
+    rope_t ret;
+    if (guts->sanelineno) {
+      this->renderLinenoCatchup(guts, ret);
+    }
+    ret += this->_childNodes.front()->renderStatement(guts, indentation);
+    return ret;
   } else {
     rope_t ret(guts->pretty ? " {" : "{");
     ret += this->renderIndentedStatement(guts, indentation + 1);
-    if (guts->pretty) {
-      ret += "\n";
-      for (int i = 0; i < indentation; ++i) {
-        ret += "  ";
+    if (guts->pretty || guts->sanelineno) {
+      bool newline;
+      if (guts->sanelineno) {
+        newline = this->renderLinenoCatchup(guts, ret);
+      } else {
+        ret += "\n";
+        newline = true;
+      }
+      if (guts->pretty && newline) {
+        for (int i = 0; i < indentation; ++i) {
+          ret += "  ";
+        }
       }
     }
     ret += "}";
@@ -84,11 +102,19 @@ rope_t Node::renderBlock(bool must, render_guts_t* guts, int indentation) const 
 }
 
 rope_t Node::renderIndentedStatement(render_guts_t* guts, int indentation) const {
-  if (guts->pretty) {
+  if (guts->pretty || guts->sanelineno) {
     rope_t ret;
-    ret += "\n";
-    for (int i = 0; i < indentation; ++i) {
-      ret += "  ";
+    bool newline;
+    if (guts->sanelineno) {
+      newline = this->renderLinenoCatchup(guts, ret);
+    } else {
+      ret += "\n";
+      newline = true;
+    }
+    if (guts->pretty && newline) {
+      for (int i = 0; i < indentation; ++i) {
+        ret += "  ";
+      }
     }
     return ret + this->renderStatement(guts, indentation);
   } else {
@@ -115,12 +141,26 @@ rope_t Node::renderImplodeChildren(render_guts_t* guts, int indentation, const c
   return ret;
 }
 
+bool Node::renderLinenoCatchup(render_guts_t* guts, rope_t &rope) const {
+  if (!this->lineno() || guts->lineno >= this->lineno()) {
+    return false;
+  }
+  rope += rope_t(this->lineno() - guts->lineno, '\n');
+  guts->lineno = this->lineno();
+  return true;
+}
+
 Node* Node::identifier() {
   return NULL;
 }
 
+unsigned int  Node::lineno() const {
+  return this->_lineno;
+}
+
 //
 // NodeStatementList: a list of statements
+NodeStatementList::NodeStatementList(const unsigned int lineno /* = 0 */) : Node(lineno) {}
 Node* NodeStatementList::clone(Node* node) const {
   return Node::clone(new NodeStatementList());
 }
@@ -136,7 +176,7 @@ rope_t NodeStatementList::render(render_guts_t* guts, int indentation) const {
 }
 
 rope_t NodeStatementList::renderBlock(bool must, render_guts_t* guts, int indentation) const {
-  if (!must && this->_childNodes.empty()) {
+  if (!must && this->empty()) {
     return rope_t(";");
   } else {
     return Node::renderBlock(must, guts, indentation);
@@ -153,13 +193,14 @@ rope_t NodeStatementList::renderStatement(render_guts_t* guts, int indentation) 
 
 //
 // NodeExpression
+NodeExpression::NodeExpression(const unsigned int lineno /* = 0 */) : Node(lineno) {}
 rope_t NodeExpression::renderStatement(render_guts_t* guts, int indentation) const {
   return this->render(guts, indentation) + ";";
 }
 
 //
 // NodeNumericLiteral: it's a number. like 5. or 3.
-NodeNumericLiteral::NodeNumericLiteral(double value) : value(value) {}
+NodeNumericLiteral::NodeNumericLiteral(double value, const unsigned int lineno /* = 0 */) : NodeExpression(lineno), value(value) {}
 
 Node* NodeNumericLiteral::clone(Node* node) const {
   return new NodeNumericLiteral(this->value);
@@ -190,7 +231,7 @@ rope_t NodeNumericLiteral::render(render_guts_t* guts, int indentation) const {
 
 //
 // NodeStringLiteral: "Hello."
-NodeStringLiteral::NodeStringLiteral(string value, bool quoted) : value(value), quoted(quoted) {}
+NodeStringLiteral::NodeStringLiteral(string value, bool quoted, const unsigned int lineno /* = 0 */) : NodeExpression(lineno), value(value), quoted(quoted) {}
 
 Node* NodeStringLiteral::clone(Node* node) const {
   return new NodeStringLiteral(this->value, this->quoted);
@@ -206,7 +247,7 @@ rope_t NodeStringLiteral::render(render_guts_t* guts, int indentation) const {
 
 //
 // NodeBooleanLiteral: true or false
-NodeBooleanLiteral::NodeBooleanLiteral(bool value) : value(value) {}
+NodeBooleanLiteral::NodeBooleanLiteral(bool value, const unsigned int lineno /* = 0 */) : NodeExpression(lineno), value(value) {}
 
 rope_t NodeBooleanLiteral::render(render_guts_t* guts, int indentation) const {
   return rope_t(this->value ? "true" : "false");
@@ -218,6 +259,7 @@ Node* NodeBooleanLiteral::clone(Node* node) const {
 
 //
 // NodeNullLiteral: null
+NodeNullLiteral::NodeNullLiteral(const unsigned int lineno /* = 0 */) : NodeExpression(lineno) {}
 Node* NodeNullLiteral::clone(Node* node) const {
   return Node::clone(new NodeNullLiteral());
 }
@@ -228,6 +270,7 @@ rope_t NodeNullLiteral::render(render_guts_t* guts, int indentation) const {
 
 //
 // NodeThis: this
+NodeThis::NodeThis(const unsigned int lineno /* = 0 */) : NodeExpression(lineno) {}
 Node* NodeThis::clone(Node* node) const {
   return Node::clone(new NodeThis());
 }
@@ -238,6 +281,7 @@ rope_t NodeThis::render(render_guts_t* guts, int indentation) const {
 
 //
 // NodeEmptyExpression
+NodeEmptyExpression::NodeEmptyExpression(const unsigned int lineno /* = 0 */) : NodeExpression(lineno) {}
 Node* NodeEmptyExpression::clone(Node* node) const {
   return Node::clone(new NodeEmptyExpression());
 }
@@ -252,7 +296,7 @@ rope_t NodeEmptyExpression::renderBlock(bool must, render_guts_t* guts, int inde
 
 //
 // NodeOperator: expression <op> expression
-NodeOperator::NodeOperator(node_operator_t op) : op(op) {}
+NodeOperator::NodeOperator(node_operator_t op, const unsigned int lineno /* = 0 */) : NodeExpression(lineno), op(op) {}
 
 Node* NodeOperator::clone(Node* node) const {
   return Node::clone(new NodeOperator(this->op));
@@ -372,6 +416,7 @@ rope_t NodeOperator::render(render_guts_t* guts, int indentation) const {
 
 //
 // NodeConditionalExpression: true ? yes() : no()
+NodeConditionalExpression::NodeConditionalExpression(const unsigned int lineno /* = 0 */) : NodeExpression(lineno) {}
 Node* NodeConditionalExpression::clone(Node* node) const {
   return Node::clone(new NodeConditionalExpression());
 }
@@ -388,6 +433,7 @@ rope_t NodeConditionalExpression::render(render_guts_t* guts, int indentation) c
 //
 // NodeParenthetical: an expression in ()'s. this is actually implicit in the AST, but we also make it an explicit
 // node. Otherwise, the renderer would have to be aware of operator precedence which would be cumbersome.
+NodeParenthetical::NodeParenthetical(const unsigned int lineno /* = 0 */) : NodeExpression(lineno) {}
 Node* NodeParenthetical::clone(Node* node) const {
   return Node::clone(new NodeParenthetical());
 }
@@ -402,7 +448,7 @@ Node* NodeParenthetical::identifier() {
 
 //
 // NodeAssignment: identifier = expression
-NodeAssignment::NodeAssignment(node_assignment_t op) : op(op) {}
+NodeAssignment::NodeAssignment(node_assignment_t op, const unsigned int lineno /* = 0 */) : NodeExpression(lineno), op(op) {}
 
 Node* NodeAssignment::clone(Node* node) const {
   return Node::clone(new NodeAssignment(this->op));
@@ -472,7 +518,7 @@ rope_t NodeAssignment::render(render_guts_t* guts, int indentation) const {
 
 //
 // NodeUnary
-NodeUnary::NodeUnary(node_unary_t op) : op(op) {}
+NodeUnary::NodeUnary(node_unary_t op, const unsigned int lineno /* = 0 */) : NodeExpression(lineno), op(op) {}
 
 Node* NodeUnary::clone(Node* node) const {
   return Node::clone(new NodeUnary(this->op));
@@ -526,7 +572,7 @@ const node_assignment_t NodeAssignment::operatorType() const {
 
 //
 // NodePostfix
-NodePostfix::NodePostfix(node_postfix_t op) : op(op) {}
+NodePostfix::NodePostfix(node_postfix_t op, const unsigned int lineno /* = 0 */) : NodeExpression(lineno), op(op) {}
 
 Node* NodePostfix::clone(Node* node) const {
   return Node::clone(new NodePostfix(this->op));
@@ -547,7 +593,7 @@ rope_t NodePostfix::render(render_guts_t* guts, int indentation) const {
 
 //
 // NodeIdentifier
-NodeIdentifier::NodeIdentifier(string name) : _name(name) {}
+NodeIdentifier::NodeIdentifier(string name, const unsigned int lineno /* = 0 */) : NodeExpression(lineno), _name(name) {}
 
 Node* NodeIdentifier::clone(Node* node) const {
   return Node::clone(new NodeIdentifier(this->_name));
@@ -567,6 +613,7 @@ Node* NodeIdentifier::identifier() {
 
 //
 // NodeArgList: list of expressions for a function call or definition
+NodeArgList::NodeArgList(const unsigned int lineno /* = 0 */) : Node(lineno) {}
 Node* NodeArgList::clone(Node* node) const {
   return Node::clone(new NodeArgList());
 }
@@ -577,7 +624,7 @@ rope_t NodeArgList::render(render_guts_t* guts, int indentation) const {
 
 //
 // NodeFunction: a function definition
-NodeFunction::NodeFunction(bool declaration /* = false */) : _declaration(declaration) {}
+NodeFunction::NodeFunction(bool declaration /* = false */, const unsigned int lineno /* = 0 */) : Node(lineno), _declaration(declaration) {}
 
 Node* NodeFunction::clone(Node* node) const {
   return Node::clone(new NodeFunction());
@@ -604,6 +651,7 @@ rope_t NodeFunction::render(render_guts_t* guts, int indentation) const {
 
 //
 // NodeFunctionCall: foo(1). note: this does not cover new foo(1);
+NodeFunctionCall::NodeFunctionCall(const unsigned int lineno /* = 0 */) : NodeExpression(lineno) {}
 Node* NodeFunctionCall::clone(Node* node) const {
   return Node::clone(new NodeFunctionCall());
 }
@@ -614,6 +662,7 @@ rope_t NodeFunctionCall::render(render_guts_t* guts, int indentation) const {
 
 //
 // NodeFunctionConstructor: new foo(1)
+NodeFunctionConstructor::NodeFunctionConstructor(const unsigned int lineno /* = 0 */) : NodeExpression(lineno) {}
 Node* NodeFunctionConstructor::clone(Node* node) const {
   return Node::clone(new NodeFunctionConstructor());
 }
@@ -624,6 +673,7 @@ rope_t NodeFunctionConstructor::render(render_guts_t* guts, int indentation) con
 
 //
 // NodeIf: if (true) { honk(dazzle); };
+NodeIf::NodeIf(const unsigned int lineno /* = 0 */) : Node(lineno) {}
 Node* NodeIf::clone(Node* node) const {
   return Node::clone(new NodeIf());
 }
@@ -640,6 +690,9 @@ rope_t NodeIf::render(render_guts_t* guts, int indentation) const {
 
     // Special-case for rendering else if's
     if (typeid(**node) == typeid(NodeIf)) {
+      if (guts->sanelineno) {
+        (*node)->renderLinenoCatchup(guts, ret);
+      }
       ret += (*node)->render(guts, indentation);
     } else {
       ret += (*node)->renderBlock(false, guts, indentation);
@@ -650,6 +703,7 @@ rope_t NodeIf::render(render_guts_t* guts, int indentation) const {
 
 //
 // NodeTry
+NodeTry::NodeTry(const unsigned int lineno /* = 0 */) : Node(lineno) {}
 Node* NodeTry::clone(Node* node) const {
   return Node::clone(new NodeTry());
 }
@@ -675,6 +729,7 @@ rope_t NodeTry::render(render_guts_t* guts, int indentation) const {
 
 //
 // NodeStatement
+NodeStatement::NodeStatement(const unsigned int lineno /* = 0 */) : Node(lineno) {}
 rope_t NodeStatement::renderStatement(render_guts_t* guts, int indentation) const {
   return this->render(guts, indentation) + ";";
 }
@@ -682,7 +737,7 @@ rope_t NodeStatement::renderStatement(render_guts_t* guts, int indentation) cons
 //
 // NodeStatementWithExpression: generalized node for return, throw, continue, and break. makes rendering easier and
 // the rewriter doesn't really need anything from the nodes
-NodeStatementWithExpression::NodeStatementWithExpression(node_statement_with_expression_t statement) : statement(statement) {}
+NodeStatementWithExpression::NodeStatementWithExpression(node_statement_with_expression_t statement, const unsigned int lineno /* = 0 */) : NodeStatement(lineno), statement(statement) {}
 
 Node* NodeStatementWithExpression::clone(Node* node) const {
   return Node::clone(new NodeStatementWithExpression(this->statement));
@@ -716,6 +771,7 @@ rope_t NodeStatementWithExpression::render(render_guts_t* guts, int indentation)
 
 //
 // NodeLabel
+NodeLabel::NodeLabel(const unsigned int lineno /* = 0 */) : Node(lineno) {}
 Node* NodeLabel::clone(Node* node) const {
   return Node::clone(new NodeLabel());
 }
@@ -726,6 +782,7 @@ rope_t NodeLabel::render(render_guts_t* guts, int indentation) const {
 
 //
 // NodeSwitch
+NodeSwitch::NodeSwitch(const unsigned int lineno /* = 0 */) : Node(lineno) {}
 Node* NodeSwitch::clone(Node* node) const {
   return Node::clone(new NodeSwitch());
 }
@@ -738,6 +795,7 @@ rope_t NodeSwitch::render(render_guts_t* guts, int indentation) const {
 
 //
 // NodeCaseClause: case: bar();
+NodeCaseClause::NodeCaseClause(const unsigned int lineno /* = 0 */) : Node(lineno) {}
 Node* NodeCaseClause::clone(Node* node) const {
   return Node::clone(new NodeCaseClause());
 }
@@ -756,6 +814,7 @@ rope_t NodeCaseClause::renderIndentedStatement(render_guts_t* guts, int indentat
 
 //
 // NodeDefaultClause: default: foo();
+NodeDefaultClause::NodeDefaultClause(const unsigned int lineno /* = 0 */) : NodeCaseClause(lineno) {}
 Node* NodeDefaultClause::clone(Node* node) const {
   return Node::clone(new NodeDefaultClause());
 }
@@ -766,7 +825,7 @@ rope_t NodeDefaultClause::render(render_guts_t* guts, int indentation) const {
 
 //
 // NodeVarDeclaration: a list of identifiers with optional assignments
-NodeVarDeclaration::NodeVarDeclaration(bool iterator /* = false */) : _iterator(iterator) {}
+NodeVarDeclaration::NodeVarDeclaration(bool iterator /* = false */, const unsigned int lineno /* = 0 */) : NodeStatement(lineno), _iterator(iterator) {}
 Node* NodeVarDeclaration::clone(Node* node) const {
   return Node::clone(new NodeVarDeclaration());
 }
@@ -786,6 +845,7 @@ Node* NodeVarDeclaration::setIterator(bool iterator) {
 
 //
 // NodeObjectLiteral
+NodeObjectLiteral::NodeObjectLiteral(const unsigned int lineno /* = 0 */) : NodeExpression(lineno) {}
 Node* NodeObjectLiteral::clone(Node* node) const {
   return Node::clone(new NodeObjectLiteral());
 }
@@ -796,6 +856,7 @@ rope_t NodeObjectLiteral::render(render_guts_t* guts, int indentation) const {
 
 //
 // NodeObjectLiteralProperty
+NodeObjectLiteralProperty::NodeObjectLiteralProperty(const unsigned int lineno /* = 0 */) : Node(lineno) {}
 Node* NodeObjectLiteralProperty::clone(Node* node) const {
   return Node::clone(new NodeObjectLiteralProperty());
 }
@@ -807,6 +868,7 @@ rope_t NodeObjectLiteralProperty::render(render_guts_t* guts, int indentation) c
 
 //
 // NodeArrayLiteral
+NodeArrayLiteral::NodeArrayLiteral(const unsigned int lineno /* = 0 */) : NodeExpression(lineno) {}
 Node* NodeArrayLiteral::clone(Node* node) const {
   return Node::clone(new NodeArrayLiteral());
 }
@@ -817,7 +879,7 @@ rope_t NodeArrayLiteral::render(render_guts_t* guts, int indentation) const {
 
 //
 // NodeStaticMemberExpression: object access via foo.bar
-NodeStaticMemberExpression::NodeStaticMemberExpression() : isAssignment(false) {}
+NodeStaticMemberExpression::NodeStaticMemberExpression(const unsigned int lineno /* = 0 */) : NodeExpression(lineno), isAssignment(false) {}
 rope_t NodeStaticMemberExpression::render(render_guts_t* guts, int indentation) const {
   return rope_t(this->_childNodes.front()->render(guts, indentation)) + "." + this->_childNodes.back()->render(guts, indentation);
 }
@@ -833,7 +895,7 @@ Node* NodeStaticMemberExpression::identifier() {
 
 //
 // NodeDynamicMemberExpression: object access via foo['bar']
-NodeDynamicMemberExpression::NodeDynamicMemberExpression() : isAssignment(false) {}
+NodeDynamicMemberExpression::NodeDynamicMemberExpression(const unsigned int lineno /* = 0 */) : NodeExpression(lineno), isAssignment(false) {}
 
 Node* NodeDynamicMemberExpression::clone(Node* node) const {
   return Node::clone(new NodeDynamicMemberExpression());
@@ -851,6 +913,7 @@ Node* NodeDynamicMemberExpression::identifier() {
 
 //
 // NodeForLoop: only for(;;); loops, not for in
+NodeForLoop::NodeForLoop(const unsigned int lineno /* = 0 */) : Node(lineno) {}
 Node* NodeForLoop::clone(Node* node) const {
   return Node::clone(new NodeForLoop());
 }
@@ -867,6 +930,7 @@ rope_t NodeForLoop::render(render_guts_t* guts, int indentation) const {
 
 //
 // NodeForIn
+NodeForIn::NodeForIn(const unsigned int lineno /* = 0 */) : Node(lineno) {}
 Node* NodeForIn::clone(Node* node) const {
   return Node::clone(new NodeForIn());
 }
@@ -882,6 +946,7 @@ rope_t NodeForIn::render(render_guts_t* guts, int indentation) const {
 
 //
 // NodeWhile
+NodeWhile::NodeWhile(const unsigned int lineno /* = 0 */) : Node(lineno) {}
 Node* NodeWhile::clone(Node* node) const {
   return Node::clone(new NodeWhile());
 }
@@ -894,13 +959,19 @@ rope_t NodeWhile::render(render_guts_t* guts, int indentation) const {
 
 //
 // NodeDoWhile
+NodeDoWhile::NodeDoWhile(const unsigned int lineno /* = 0 */) : NodeStatement(lineno) {}
 Node* NodeDoWhile::clone(Node* node) const {
   return Node::clone(new NodeDoWhile());
 }
 
 rope_t NodeDoWhile::render(render_guts_t* guts, int indentation) const {
-  return rope_t("do") +
-    // Technically this shouldn't be renderBlock(true, ...) but requiring braces makes it easier to render it all...
-    this->_childNodes.front()->renderBlock(true, guts, indentation) +
-    (guts->pretty ? " while (" : "while(") + this->_childNodes.back()->render(guts, indentation) + ")";
+  rope_t ret("do");
+  // Technically this shouldn't be renderBlock(true, ...) but requiring braces makes it easier to render it all...
+  ret += this->_childNodes.front()->renderBlock(true, guts, indentation);
+  if (guts->sanelineno) {
+    this->_childNodes.back()->renderLinenoCatchup(guts, ret);
+  }
+  ret += (guts->pretty ? " while (" : "while(") ;
+  ret += this->_childNodes.back()->render(guts, indentation) + ")";
+  return ret;
 }

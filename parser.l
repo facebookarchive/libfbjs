@@ -52,7 +52,7 @@ FBJSBEGIN(IDENTIFIER);
     bool newline = false;
     for (;;) {
       while ((c = yyinput(yyscanner)) != '*' && c != EOF) {
-        if (c == '\n' || c == '\r') {
+        if (c == '\n') {
           yylloc->first_line++;
           newline = true;
         }
@@ -68,6 +68,9 @@ FBJSBEGIN(IDENTIFIER);
         break;
       }
     }
+    // This is to properly interpret virtual semicolons, see section 7.4 of E262-3. Essentially, this should parse:
+    //   foo = 5/*
+    // */bar = 6;
     if (newline) {
       yylloc->first_line--;
       unput('\n');

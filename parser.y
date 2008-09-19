@@ -21,6 +21,7 @@ extern int yydebug;
 }
 
 %{
+#define yylineno (unsigned int)(yylloc.first_line)
 
 void parser_note_error(void* yyscanner, const char* str) {
   fbjs_parse_extra* extra = yyget_extra(yyscanner);
@@ -84,7 +85,7 @@ void yyerror(YYLTYPE* yyloc, void* yyscanner, void* node, const char* str) {
 
 %start program
 
-%type<node> literal null_literal boolean_literal numeric_literal regex_literal string_literal primary_expression array_literal element_list object_literal property_name_and_value_list property_name member_expression new_expression call_expression arguments argument_list left_hand_side_expression postfix_expression unary_expression multiplicative_expression additive_expression shift_expression relational_expression relational_expression_no_in equality_expression equality_expression_no_in bitwise_and_expression bitwise_and_expression_no_in bitwise_xor_expression bitwise_xor_expression_no_in bitwise_or_expression bitwise_or_expression_no_in logical_and_expression logical_and_expression_no_in logical_or_expression logical_or_expression_no_in conditional_expression conditional_expression_no_in assignment_expression assignment_expression_no_in expression expression_opt expression_no_in_opt expression_no_in statement block statement_list source_element variable_statement variable_declaration_list variable_declaration_list_no_in variable_declaration variable_declaration_no_in initializer initializer_no_in empty_statement expression_statement if_statement iteration_statement continue_statement break_statement return_statement with_statement switch_statement case_block case_clauses_with_default case_clauses_no_default labelled_statement throw_statement try_statement finally function_expression function_declaration formal_parameter_list identifier function_body
+%type<node> literal null_literal boolean_literal numeric_literal regex_literal string_literal primary_expression array_literal element_list object_literal property_name_and_value_list property_name member_expression new_expression call_expression arguments argument_list left_hand_side_expression postfix_expression unary_expression multiplicative_expression additive_expression shift_expression relational_expression relational_expression_no_in equality_expression equality_expression_no_in bitwise_and_expression bitwise_and_expression_no_in bitwise_xor_expression bitwise_xor_expression_no_in bitwise_or_expression bitwise_or_expression_no_in logical_and_expression logical_and_expression_no_in logical_or_expression logical_or_expression_no_in conditional_expression conditional_expression_no_in assignment_expression assignment_expression_no_in expression expression_opt expression_no_in_opt expression_no_in statement block statement_list source_element variable_statement variable_declaration_list variable_declaration_list_no_in variable_declaration variable_declaration_no_in initializer initializer_no_in empty_statement expression_statement if_statement iteration_statement continue_statement break_statement return_statement with_statement switch_statement case_block case_clauses_with_default case_clauses_no_default default_label labelled_statement throw_statement try_statement finally function_expression function_declaration formal_parameter_list identifier function_body
 %type<duple> catch case_clause default_clause
 %type<assignment> assignment_operator
 %type<integer> elison
@@ -104,10 +105,10 @@ statement_list:
     source_element {
       // Silly hack since my awesome lexer sticks `t_VIRTUAL_SEMICOLON's all over the place which ends up creating tons of `NodeEmptyExpression's
       if (dynamic_cast<NodeEmptyExpression*>($1) == NULL) {
-        $$ = (new NodeStatementList())->appendChild($1);
+        $$ = (new NodeStatementList(yylineno))->appendChild($1);
       } else {
         delete $1;
-        $$ = new NodeStatementList();
+        $$ = new NodeStatementList(yylineno);
       }
     }
 |   statement_list source_element {
@@ -135,69 +136,69 @@ literal:
 
 null_literal:
     t_NULL {
-      $$ = new NodeNullLiteral();
+      $$ = new NodeNullLiteral(yylineno);
     }
 ;
 
 boolean_literal:
     t_TRUE {
-      $$ = new NodeBooleanLiteral(true);
+      $$ = new NodeBooleanLiteral(true, yylineno);
     }
 |   t_FALSE {
-      $$ = new NodeBooleanLiteral(false);
+      $$ = new NodeBooleanLiteral(false, yylineno);
     }
 ;
 
 numeric_literal:
     t_NUMBER {
-      $$ = new NodeNumericLiteral($1);
+      $$ = new NodeNumericLiteral($1, yylineno);
     }
 ;
 
 regex_literal:
     t_REGEX {
       // note: i'm lazy here and just reuse the string_literal class
-      $$ = new NodeStringLiteral($1, true);
+      $$ = new NodeStringLiteral($1, true, yylineno);
       free($1);
     }
 ;
 
 string_literal:
     t_STRING {
-      $$ = new NodeStringLiteral($1, true);
+      $$ = new NodeStringLiteral($1, true, yylineno);
       free($1);
     }
 ;
 
 identifier:
     t_IDENTIFIER {
-      $$ = new NodeIdentifier($1);
+      $$ = new NodeIdentifier($1, yylineno);
       free($1);
     }
 ;
 
 primary_expression:
     t_THIS {
-      $$ = new NodeThis();
+      $$ = new NodeThis(yylineno);
     }
 |   identifier
 |   literal
 |   array_literal
 |   object_literal
 |   t_LPAREN expression t_RPAREN {
-      $$ = (new NodeParenthetical())->appendChild($2);
+      $$ = (new NodeParenthetical(yylineno))->appendChild($2);
     }
 ;
 
 array_literal:
     t_LBRACKET elison t_RBRACKET {
-      $$ = (new NodeArrayLiteral());
+      $$ = (new NodeArrayLiteral(yylineno));
       for (int i = 0; i < $2 + 1; i++) {
-        $$->appendChild(new NodeEmptyExpression());
+        $$->appendChild(new NodeEmptyExpression(yylineno));
       }
     }
 |   t_LBRACKET t_RBRACKET {
-      $$ = new NodeArrayLiteral();
+      $$ = new NodeArrayLiteral(yylineno);
     }
 |   t_LBRACKET element_list t_RBRACKET {
       $$ = $2;
@@ -205,26 +206,26 @@ array_literal:
 |   t_LBRACKET element_list elison t_RBRACKET {
        $$ = $2;
        for (int i = 0; i < $3; i++) {
-         $$->appendChild(new NodeEmptyExpression());
+         $$->appendChild(new NodeEmptyExpression(yylineno));
        }
     }
 ;
 
 element_list:
     elison assignment_expression {
-      $$ = (new NodeArrayLiteral());
+      $$ = (new NodeArrayLiteral(yylineno));
       for (int i = 0; i < $1; i++) {
-        $$->appendChild(new NodeEmptyExpression());
+        $$->appendChild(new NodeEmptyExpression(yylineno));
       }
       $$->appendChild($2);
     }
 |   assignment_expression {
-      $$ = (new NodeArrayLiteral())->appendChild($1);
+      $$ = (new NodeArrayLiteral(yylineno))->appendChild($1);
     }
 |   element_list elison assignment_expression {
       $$ = $1;
       for (int i = 1; i < $2; i++) {
-        $$->appendChild(new NodeEmptyExpression());
+        $$->appendChild(new NodeEmptyExpression(yylineno));
       }
       $$->appendChild($3);
     }
@@ -244,7 +245,7 @@ elison:
 
 object_literal:
     t_OBJECT_LITERAL_HACK t_LCURLY t_RCURLY {
-      $$ = new NodeObjectLiteral();
+      $$ = new NodeObjectLiteral(yylineno);
     }
 |   t_OBJECT_LITERAL_HACK t_LCURLY property_name_and_value_list t_VIRTUAL_SEMICOLON t_RCURLY { /* note the t_VIRTUAL_SEMICOLON hack */
       $$ = $3;
@@ -253,10 +254,10 @@ object_literal:
 
 property_name_and_value_list:
     property_name t_COLON assignment_expression {
-      $$ = (new NodeObjectLiteral())->appendChild((new NodeObjectLiteralProperty())->appendChild($1)->appendChild($3));
+      $$ = (new NodeObjectLiteral(yylineno))->appendChild((new NodeObjectLiteralProperty(yylineno))->appendChild($1)->appendChild($3));
     }
 |   property_name_and_value_list t_COMMA property_name t_COLON assignment_expression {
-      $$ = $1->appendChild((new NodeObjectLiteralProperty())->appendChild($3)->appendChild($5));
+      $$ = $1->appendChild((new NodeObjectLiteralProperty(yylineno))->appendChild($3)->appendChild($5));
     }
 ;
 
@@ -272,41 +273,41 @@ member_expression:
       $$ = $2;
     }
 |   member_expression t_LBRACKET expression t_RBRACKET {
-      $$ = (new NodeDynamicMemberExpression())->appendChild($1)->appendChild($3);
+      $$ = (new NodeDynamicMemberExpression(yylineno))->appendChild($1)->appendChild($3);
     }
 |   member_expression t_PERIOD identifier {
-      $$ = (new NodeStaticMemberExpression())->appendChild($1)->appendChild($3);
+      $$ = (new NodeStaticMemberExpression(yylineno))->appendChild($1)->appendChild($3);
     }
 |   t_NEW member_expression arguments {
-      $$ = (new NodeFunctionConstructor())->appendChild($2)->appendChild($3);
+      $$ = (new NodeFunctionConstructor(yylineno))->appendChild($2)->appendChild($3);
     }
 ;
 
 new_expression:
     member_expression
 |   t_NEW new_expression {
-      $$ = (new NodeFunctionConstructor())->appendChild($2)->appendChild(new NodeArgList());
+      $$ = (new NodeFunctionConstructor(yylineno))->appendChild($2)->appendChild(new NodeArgList(yylineno));
     }
 ;
 
 call_expression:
     member_expression arguments {
-      $$ = (new NodeFunctionCall())->appendChild($1)->appendChild($2);
+      $$ = (new NodeFunctionCall(yylineno))->appendChild($1)->appendChild($2);
     }
 |   call_expression arguments {
-      $$ = (new NodeFunctionCall())->appendChild($1)->appendChild($2);
+      $$ = (new NodeFunctionCall(yylineno))->appendChild($1)->appendChild($2);
     }
 |   call_expression t_LBRACKET expression t_RBRACKET {
-      $$ = (new NodeDynamicMemberExpression())->appendChild($1)->appendChild($3);
+      $$ = (new NodeDynamicMemberExpression(yylineno))->appendChild($1)->appendChild($3);
     }
 |   call_expression t_PERIOD identifier {
-      $$ = (new NodeStaticMemberExpression())->appendChild($1)->appendChild($3);
+      $$ = (new NodeStaticMemberExpression(yylineno))->appendChild($1)->appendChild($3);
     }
 ;
 
 arguments:
     t_LPAREN t_RPAREN {
-      $$ = new NodeArgList();
+      $$ = new NodeArgList(yylineno);
     }
 |   t_LPAREN argument_list t_RPAREN {
       $$ = $2;
@@ -315,7 +316,7 @@ arguments:
 
 argument_list:
     assignment_expression {
-      $$ = (new NodeArgList())->appendChild($1);
+      $$ = (new NodeArgList(yylineno))->appendChild($1);
     }
 |   argument_list t_COMMA assignment_expression {
       $$ = $1->appendChild($3);
@@ -330,242 +331,242 @@ left_hand_side_expression:
 postfix_expression:
     left_hand_side_expression
 |   left_hand_side_expression t_INCR {
-      $$ = (new NodePostfix(INCR_POSTFIX))->appendChild($1);
+      $$ = (new NodePostfix(INCR_POSTFIX, yylineno))->appendChild($1);
     }
 |   left_hand_side_expression t_DECR {
-      $$ = (new NodePostfix(DECR_POSTFIX))->appendChild($1);
+      $$ = (new NodePostfix(DECR_POSTFIX, yylineno))->appendChild($1);
     }
 ;
 
 unary_expression:
     postfix_expression
 |   t_DELETE unary_expression {
-      $$ = (new NodeUnary(DELETE))->appendChild($2);
+      $$ = (new NodeUnary(DELETE, yylineno))->appendChild($2);
     }
 |   t_VOID unary_expression {
-      $$ = (new NodeUnary(VOID))->appendChild($2);
+      $$ = (new NodeUnary(VOID, yylineno))->appendChild($2);
     }
 |   t_TYPEOF unary_expression {
-      $$ = (new NodeUnary(TYPEOF))->appendChild($2);
+      $$ = (new NodeUnary(TYPEOF, yylineno))->appendChild($2);
     }
 |   t_INCR unary_expression {
-      $$ = (new NodeUnary(INCR_UNARY))->appendChild($2);
+      $$ = (new NodeUnary(INCR_UNARY, yylineno))->appendChild($2);
       if ($2->identifier() == NULL) {
         parsererror("invalid increment operand");
         $$ = NULL;
       }
     }
 |   t_DECR unary_expression {
-      $$ = (new NodeUnary(DECR_UNARY))->appendChild($2);
+      $$ = (new NodeUnary(DECR_UNARY, yylineno))->appendChild($2);
       if ($2->identifier() == NULL) {
         parsererror("invalid decrement operand");
         $$ = NULL;
       }
     }
 |   t_PLUS unary_expression {
-      $$ = (new NodeUnary(PLUS_UNARY))->appendChild($2);
+      $$ = (new NodeUnary(PLUS_UNARY, yylineno))->appendChild($2);
     }
 |   t_MINUS unary_expression {
-      $$ = (new NodeUnary(MINUS_UNARY))->appendChild($2);
+      $$ = (new NodeUnary(MINUS_UNARY, yylineno))->appendChild($2);
     }
 |   t_BIT_NOT unary_expression {
-      $$ = (new NodeUnary(BIT_NOT_UNARY))->appendChild($2);
+      $$ = (new NodeUnary(BIT_NOT_UNARY, yylineno))->appendChild($2);
     }
 |   t_NOT unary_expression {
-      $$ = (new NodeUnary(NOT_UNARY))->appendChild($2);
+      $$ = (new NodeUnary(NOT_UNARY, yylineno))->appendChild($2);
     }
 ;
 
 multiplicative_expression:
     unary_expression
 |   multiplicative_expression t_MULT unary_expression {
-      $$ = (new NodeOperator(MULT))->appendChild($1)->appendChild($3);
+      $$ = (new NodeOperator(MULT, yylineno))->appendChild($1)->appendChild($3);
     }
 |   multiplicative_expression t_DIV unary_expression {
-      $$ = (new NodeOperator(DIV))->appendChild($1)->appendChild($3);
+      $$ = (new NodeOperator(DIV, yylineno))->appendChild($1)->appendChild($3);
     }
 |   multiplicative_expression t_MOD unary_expression {
-      $$ = (new NodeOperator(MOD))->appendChild($1)->appendChild($3);
+      $$ = (new NodeOperator(MOD, yylineno))->appendChild($1)->appendChild($3);
     }
 ;
 
 additive_expression:
     multiplicative_expression
 |   additive_expression t_PLUS multiplicative_expression {
-      $$ = (new NodeOperator(PLUS))->appendChild($1)->appendChild($3);
+      $$ = (new NodeOperator(PLUS, yylineno))->appendChild($1)->appendChild($3);
     }
 |   additive_expression t_MINUS multiplicative_expression {
-      $$ = (new NodeOperator(MINUS))->appendChild($1)->appendChild($3);
+      $$ = (new NodeOperator(MINUS, yylineno))->appendChild($1)->appendChild($3);
     }
 ;
 
 shift_expression:
     additive_expression
 |   shift_expression t_LSHIFT additive_expression {
-      $$ = (new NodeOperator(LSHIFT))->appendChild($1)->appendChild($3);
+      $$ = (new NodeOperator(LSHIFT, yylineno))->appendChild($1)->appendChild($3);
     }
 |   shift_expression t_RSHIFT additive_expression {
-      $$ = (new NodeOperator(RSHIFT))->appendChild($1)->appendChild($3);
+      $$ = (new NodeOperator(RSHIFT, yylineno))->appendChild($1)->appendChild($3);
     }
 |   shift_expression t_RSHIFT3 additive_expression {
-      $$ = (new NodeOperator(RSHIFT3))->appendChild($1)->appendChild($3);
+      $$ = (new NodeOperator(RSHIFT3, yylineno))->appendChild($1)->appendChild($3);
     }
 ;
 
 relational_expression:
     shift_expression
 |   relational_expression t_LESS_THAN shift_expression {
-      $$ = (new NodeOperator(LESS_THAN))->appendChild($1)->appendChild($3);
+      $$ = (new NodeOperator(LESS_THAN, yylineno))->appendChild($1)->appendChild($3);
     }
 |   relational_expression t_GREATER_THAN shift_expression {
-      $$ = (new NodeOperator(GREATER_THAN))->appendChild($1)->appendChild($3);
+      $$ = (new NodeOperator(GREATER_THAN, yylineno))->appendChild($1)->appendChild($3);
     }
 |   relational_expression t_LESS_THAN_EQUAL shift_expression {
-      $$ = (new NodeOperator(LESS_THAN_EQUAL))->appendChild($1)->appendChild($3);
+      $$ = (new NodeOperator(LESS_THAN_EQUAL, yylineno))->appendChild($1)->appendChild($3);
     }
 |   relational_expression t_GREATER_THAN_EQUAL shift_expression {
-      $$ = (new NodeOperator(GREATER_THAN_EQUAL))->appendChild($1)->appendChild($3);
+      $$ = (new NodeOperator(GREATER_THAN_EQUAL, yylineno))->appendChild($1)->appendChild($3);
     }
 |   relational_expression t_INSTANCEOF shift_expression {
-      $$ = (new NodeOperator(INSTANCEOF))->appendChild($1)->appendChild($3);
+      $$ = (new NodeOperator(INSTANCEOF, yylineno))->appendChild($1)->appendChild($3);
     }
 |   relational_expression t_IN shift_expression {
-      $$ = (new NodeOperator(IN))->appendChild($1)->appendChild($3);
+      $$ = (new NodeOperator(IN, yylineno))->appendChild($1)->appendChild($3);
     }
 ;
 
 relational_expression_no_in:
     shift_expression
 |   relational_expression t_LESS_THAN shift_expression {
-      $$ = (new NodeOperator(LESS_THAN))->appendChild($1)->appendChild($3);
+      $$ = (new NodeOperator(LESS_THAN, yylineno))->appendChild($1)->appendChild($3);
     }
 |   relational_expression t_GREATER_THAN shift_expression {
-      $$ = (new NodeOperator(GREATER_THAN))->appendChild($1)->appendChild($3);
+      $$ = (new NodeOperator(GREATER_THAN, yylineno))->appendChild($1)->appendChild($3);
     }
 |   relational_expression t_LESS_THAN_EQUAL shift_expression {
-      $$ = (new NodeOperator(LESS_THAN_EQUAL))->appendChild($1)->appendChild($3);
+      $$ = (new NodeOperator(LESS_THAN_EQUAL, yylineno))->appendChild($1)->appendChild($3);
     }
 |   relational_expression t_GREATER_THAN_EQUAL shift_expression {
-      $$ = (new NodeOperator(GREATER_THAN_EQUAL))->appendChild($1)->appendChild($3);
+      $$ = (new NodeOperator(GREATER_THAN_EQUAL, yylineno))->appendChild($1)->appendChild($3);
     }
 |   relational_expression t_INSTANCEOF shift_expression {
-      $$ = (new NodeOperator(INSTANCEOF))->appendChild($1)->appendChild($3);
+      $$ = (new NodeOperator(INSTANCEOF, yylineno))->appendChild($1)->appendChild($3);
     }
 ;
 
 equality_expression:
     relational_expression
 |   equality_expression t_EQUAL relational_expression {
-      $$ = (new NodeOperator(EQUAL))->appendChild($1)->appendChild($3);
+      $$ = (new NodeOperator(EQUAL, yylineno))->appendChild($1)->appendChild($3);
     }
 |   equality_expression t_NOT_EQUAL relational_expression {
-      $$ = (new NodeOperator(NOT_EQUAL))->appendChild($1)->appendChild($3);
+      $$ = (new NodeOperator(NOT_EQUAL, yylineno))->appendChild($1)->appendChild($3);
     }
 |   equality_expression t_STRICT_EQUAL relational_expression {
-      $$ = (new NodeOperator(STRICT_EQUAL))->appendChild($1)->appendChild($3);
+      $$ = (new NodeOperator(STRICT_EQUAL, yylineno))->appendChild($1)->appendChild($3);
     }
 |   equality_expression t_STRICT_NOT_EQUAL relational_expression {
-      $$ = (new NodeOperator(STRICT_NOT_EQUAL))->appendChild($1)->appendChild($3);
+      $$ = (new NodeOperator(STRICT_NOT_EQUAL, yylineno))->appendChild($1)->appendChild($3);
     }
 ;
 
 equality_expression_no_in:
     relational_expression_no_in
 |   equality_expression t_EQUAL relational_expression_no_in {
-      $$ = (new NodeOperator(EQUAL))->appendChild($1)->appendChild($3);
+      $$ = (new NodeOperator(EQUAL, yylineno))->appendChild($1)->appendChild($3);
     }
 |   equality_expression t_NOT_EQUAL relational_expression_no_in {
-      $$ = (new NodeOperator(NOT_EQUAL))->appendChild($1)->appendChild($3);
+      $$ = (new NodeOperator(NOT_EQUAL, yylineno))->appendChild($1)->appendChild($3);
     }
 |   equality_expression t_STRICT_EQUAL relational_expression_no_in {
-      $$ = (new NodeOperator(STRICT_EQUAL))->appendChild($1)->appendChild($3);
+      $$ = (new NodeOperator(STRICT_EQUAL, yylineno))->appendChild($1)->appendChild($3);
     }
 |   equality_expression t_STRICT_NOT_EQUAL relational_expression_no_in {
-      $$ = (new NodeOperator(STRICT_NOT_EQUAL))->appendChild($1)->appendChild($3);
+      $$ = (new NodeOperator(STRICT_NOT_EQUAL, yylineno))->appendChild($1)->appendChild($3);
     }
 ;
 
 bitwise_and_expression:
     equality_expression
 |   bitwise_and_expression t_BIT_AND equality_expression {
-      $$ = (new NodeOperator(BIT_AND))->appendChild($1)->appendChild($3);
+      $$ = (new NodeOperator(BIT_AND, yylineno))->appendChild($1)->appendChild($3);
     }
 ;
 
 bitwise_and_expression_no_in:
     equality_expression_no_in
 |   bitwise_and_expression_no_in t_BIT_AND equality_expression {
-      $$ = (new NodeOperator(BIT_AND))->appendChild($1)->appendChild($3);
+      $$ = (new NodeOperator(BIT_AND, yylineno))->appendChild($1)->appendChild($3);
     }
 ;
 
 bitwise_xor_expression:
     bitwise_and_expression
 |   bitwise_xor_expression t_BIT_XOR bitwise_and_expression {
-      $$ = (new NodeOperator(BIT_XOR))->appendChild($1)->appendChild($3);
+      $$ = (new NodeOperator(BIT_XOR, yylineno))->appendChild($1)->appendChild($3);
     }
 ;
 
 bitwise_xor_expression_no_in:
     bitwise_and_expression_no_in
 |   bitwise_xor_expression_no_in t_BIT_XOR bitwise_and_expression_no_in {
-      $$ = (new NodeOperator(BIT_XOR))->appendChild($1)->appendChild($3);
+      $$ = (new NodeOperator(BIT_XOR, yylineno))->appendChild($1)->appendChild($3);
     }
 ;
 
 bitwise_or_expression:
     bitwise_xor_expression
 |   bitwise_or_expression t_BIT_OR bitwise_xor_expression {
-      $$ = (new NodeOperator(BIT_OR))->appendChild($1)->appendChild($3);
+      $$ = (new NodeOperator(BIT_OR, yylineno))->appendChild($1)->appendChild($3);
     }
 ;
 
 bitwise_or_expression_no_in:
     bitwise_xor_expression_no_in
 |   bitwise_or_expression_no_in t_BIT_OR bitwise_xor_expression_no_in {
-      $$ = (new NodeOperator(OR))->appendChild($1)->appendChild($3);
+      $$ = (new NodeOperator(OR, yylineno))->appendChild($1)->appendChild($3);
     }
 ;
 
 logical_and_expression:
     bitwise_or_expression
 |   logical_and_expression t_AND bitwise_or_expression {
-      $$ = (new NodeOperator(AND))->appendChild($1)->appendChild($3);
+      $$ = (new NodeOperator(AND, yylineno))->appendChild($1)->appendChild($3);
     }
 ;
 
 logical_and_expression_no_in:
     bitwise_or_expression_no_in
 |   logical_and_expression_no_in t_AND bitwise_or_expression_no_in {
-      $$ = (new NodeOperator(AND))->appendChild($1)->appendChild($3);
+      $$ = (new NodeOperator(AND, yylineno))->appendChild($1)->appendChild($3);
     }
 ;
 
 logical_or_expression:
     logical_and_expression
 |   logical_or_expression t_OR logical_and_expression {
-      $$ = (new NodeOperator(OR))->appendChild($1)->appendChild($3);
+      $$ = (new NodeOperator(OR, yylineno))->appendChild($1)->appendChild($3);
     }
 ;
 
 logical_or_expression_no_in:
     logical_and_expression_no_in
 |   logical_or_expression_no_in t_OR logical_and_expression_no_in {
-      $$ = (new NodeOperator(OR))->appendChild($1)->appendChild($3);
+      $$ = (new NodeOperator(OR, yylineno))->appendChild($1)->appendChild($3);
     }
 ;
 
 conditional_expression:
     logical_or_expression
 |   logical_or_expression t_PLING assignment_expression t_COLON assignment_expression {
-      $$ = (new NodeConditionalExpression())->appendChild($1)->appendChild($3)->appendChild($5);
+      $$ = (new NodeConditionalExpression(yylineno))->appendChild($1)->appendChild($3)->appendChild($5);
     }
 ;
 
 conditional_expression_no_in:
     logical_or_expression_no_in
 |   logical_or_expression_no_in t_PLING assignment_expression t_COLON assignment_expression {
-      $$ = (new NodeConditionalExpression())->appendChild($1)->appendChild($3)->appendChild($5);
+      $$ = (new NodeConditionalExpression(yylineno))->appendChild($1)->appendChild($3)->appendChild($5);
     }
 ;
 
@@ -576,7 +577,7 @@ assignment_expression:
         parsererror("invalid assignment left-hand side");
         $$ = NULL;
       } else {
-        $$ = (new NodeAssignment($2))->appendChild($1)->appendChild($3);
+        $$ = (new NodeAssignment($2, yylineno))->appendChild($1)->appendChild($3);
       }
     }
 ;
@@ -588,7 +589,7 @@ assignment_expression_no_in:
         parsererror("invalid assignment left-hand side");
         $$ = NULL;
       } else {
-        $$ = (new NodeAssignment($2))->appendChild($1)->appendChild($3);
+        $$ = (new NodeAssignment($2, yylineno))->appendChild($1)->appendChild($3);
       }
     }
 ;
@@ -635,13 +636,13 @@ assignment_operator:
 expression:
     assignment_expression
 |   expression t_COMMA assignment_expression {
-      $$ = (new NodeOperator(COMMA))->appendChild($1)->appendChild($3);
+      $$ = (new NodeOperator(COMMA, yylineno))->appendChild($1)->appendChild($3);
     }
 ;
 
 expression_opt:
     /* empty */ {
-      $$ = new NodeEmptyExpression();
+      $$ = new NodeEmptyExpression(yylineno);
     }
 |   expression
 ;
@@ -649,13 +650,13 @@ expression_opt:
 expression_no_in:
     assignment_expression_no_in
 |   expression_no_in t_COMMA assignment_expression_no_in {
-      $$ = (new NodeOperator(COMMA))->appendChild($1)->appendChild($3);
+      $$ = (new NodeOperator(COMMA, yylineno))->appendChild($1)->appendChild($3);
     }
 ;
 
 expression_no_in_opt:
     /* empty */ {
-      $$ = new NodeEmptyExpression();
+      $$ = new NodeEmptyExpression(yylineno);
     }
 |   expression_no_in
 ;
@@ -682,7 +683,7 @@ block:
       $$ = $2;
     }
 |   t_LCURLY t_RCURLY {
-      $$ = new NodeStatementList();
+      $$ = new NodeStatementList(yylineno);
     }
 ;
 
@@ -694,7 +695,7 @@ variable_statement:
 
 variable_declaration_list:
     variable_declaration {
-      $$ = (new NodeVarDeclaration())->appendChild($1);
+      $$ = (new NodeVarDeclaration(true, yylineno))->appendChild($1);
     }
 |   variable_declaration_list t_COMMA variable_declaration {
       $$->appendChild($3);
@@ -703,7 +704,7 @@ variable_declaration_list:
 
 variable_declaration_list_no_in:
     variable_declaration_no_in {
-      $$ = (new NodeVarDeclaration())->appendChild($1);
+      $$ = (new NodeVarDeclaration(false, yylineno))->appendChild($1);
     }
 |   variable_declaration_list_no_in t_COMMA variable_declaration_no_in {
       $$->appendChild($3);
@@ -712,14 +713,14 @@ variable_declaration_list_no_in:
 
 variable_declaration:
     identifier initializer {
-      $$ = (new NodeAssignment(ASSIGN))->appendChild($1)->appendChild($2);
+      $$ = (new NodeAssignment(ASSIGN, yylineno))->appendChild($1)->appendChild($2);
     }
 |   identifier
 ;
 
 variable_declaration_no_in:
     identifier initializer_no_in {
-      $$ = (new NodeAssignment(ASSIGN))->appendChild($1)->appendChild($2);
+      $$ = (new NodeAssignment(ASSIGN, yylineno))->appendChild($1)->appendChild($2);
     }
 |   identifier
 ;
@@ -738,7 +739,7 @@ initializer_no_in:
 
 empty_statement:
     semicolon {
-      $$ = new NodeEmptyExpression();
+      $$ = new NodeEmptyExpression(yylineno);
     }
 ;
 
@@ -750,58 +751,58 @@ expression_statement:
 
 if_statement:
     t_IF t_LPAREN expression t_RPAREN statement t_ELSE statement {
-      $$ = (new NodeIf())->appendChild($3)->appendChild($5)->appendChild($7);
+      $$ = (new NodeIf($3->lineno()))->appendChild($3)->appendChild($5)->appendChild($7);
     }
 |   t_IF t_LPAREN expression t_RPAREN statement %prec p_IF {
-      $$ = (new NodeIf())->appendChild($3)->appendChild($5)->appendChild(NULL);
+      $$ = (new NodeIf($3->lineno()))->appendChild($3)->appendChild($5)->appendChild(NULL);
     }
 ;
 
 iteration_statement:
     t_DO statement t_WHILE t_LPAREN expression t_RPAREN semicolon {
-      $$ = (new NodeDoWhile())->appendChild($2)->appendChild($5);
+      $$ = (new NodeDoWhile($2->lineno()))->appendChild($2)->appendChild($5);
     }
 |   t_WHILE t_LPAREN expression t_RPAREN statement {
-      $$ = (new NodeWhile())->appendChild($3)->appendChild($5);
+      $$ = (new NodeWhile($3->lineno()))->appendChild($3)->appendChild($5);
     }
 |   t_FOR t_LPAREN expression_no_in_opt t_SEMICOLON expression_opt t_SEMICOLON expression_opt t_RPAREN statement {
-      $$ = (new NodeForLoop())->appendChild($3)->appendChild($5)->appendChild($7)->appendChild($9);
+      $$ = (new NodeForLoop($3->lineno()))->appendChild($3)->appendChild($5)->appendChild($7)->appendChild($9);
     }
 |   t_FOR t_LPAREN t_VAR variable_declaration_list_no_in t_SEMICOLON expression_opt t_SEMICOLON expression_opt t_RPAREN statement {
-      $$ = (new NodeForLoop())->appendChild($4)->appendChild($6)->appendChild($8)->appendChild($10);
+      $$ = (new NodeForLoop($4->lineno()))->appendChild($4)->appendChild($6)->appendChild($8)->appendChild($10);
     }
 |   t_FOR t_LPAREN left_hand_side_expression t_IN expression t_RPAREN statement {
-      $$ = (new NodeForIn())->appendChild($3)->appendChild($5)->appendChild($7);
+      $$ = (new NodeForIn($3->lineno()))->appendChild($3)->appendChild($5)->appendChild($7);
     }
 |   t_FOR t_LPAREN t_VAR variable_declaration_list_no_in t_IN expression t_RPAREN statement {
-      $$ = (new NodeForIn())->appendChild(static_cast<NodeVarDeclaration*>($4)->setIterator(true))->appendChild($6)->appendChild($8);
+      $$ = (new NodeForIn($4->lineno()))->appendChild(static_cast<NodeVarDeclaration*>($4)->setIterator(true))->appendChild($6)->appendChild($8);
     }
 ;
 
 continue_statement:
     t_CONTINUE identifier semicolon {
-      $$ = (new NodeStatementWithExpression(CONTINUE))->appendChild($2);
+      $$ = (new NodeStatementWithExpression(CONTINUE, yylineno))->appendChild($2);
     }
 |   t_CONTINUE semicolon {
-      $$ = (new NodeStatementWithExpression(CONTINUE))->appendChild(NULL);
+      $$ = (new NodeStatementWithExpression(CONTINUE, yylineno))->appendChild(NULL);
     }
 ;
 
 break_statement:
     t_BREAK identifier semicolon {
-      $$ = (new NodeStatementWithExpression(BREAK))->appendChild($2);
+      $$ = (new NodeStatementWithExpression(BREAK, yylineno))->appendChild($2);
     }
 |   t_BREAK semicolon {
-      $$ = (new NodeStatementWithExpression(BREAK))->appendChild(NULL);
+      $$ = (new NodeStatementWithExpression(BREAK, yylineno))->appendChild(NULL);
     }
 ;
 
 return_statement:
     t_RETURN expression semicolon {
-      $$ = (new NodeStatementWithExpression(RETURN))->appendChild($2);
+      $$ = (new NodeStatementWithExpression(RETURN, yylineno))->appendChild($2);
     }
 |   t_RETURN semicolon {
-      $$ = (new NodeStatementWithExpression(RETURN))->appendChild(NULL);
+      $$ = (new NodeStatementWithExpression(RETURN, yylineno))->appendChild(NULL);
     }
 ;
 
@@ -813,7 +814,7 @@ with_statement:
 
 switch_statement:
     t_SWITCH t_LPAREN expression t_RPAREN case_block {
-      $$ = (new NodeSwitch())->appendChild($3)->appendChild($5);
+      $$ = (new NodeSwitch($3->lineno()))->appendChild($3)->appendChild($5);
     }
 ;
 
@@ -825,7 +826,7 @@ case_block:
       $$ = $2;
     }
 |   t_LCURLY t_RCURLY {
-      $$ = new NodeStatementList();
+      $$ = new NodeStatementList(yylineno);
     }
 ;
 
@@ -837,7 +838,7 @@ case_clauses_with_default:
       }
     }
 |   default_clause {
-      $$ = (new NodeCaseClause())->appendChild($1[0]);
+      $$ = (new NodeCaseClause(yylineno))->appendChild($1[0]);
       if ($1[1] != NULL) {
         $$->appendChild($1[1]);
       }
@@ -846,7 +847,7 @@ case_clauses_with_default:
 
 case_clauses_no_default:
     case_clause {
-      $$ = (new NodeStatementList())->appendChild($1[0]);
+      $$ = (new NodeStatementList(yylineno))->appendChild($1[0]);
       if ($1[1] != NULL) {
         $$->appendChild($1[1]);
       }
@@ -861,47 +862,53 @@ case_clauses_no_default:
 
 case_clause:
     t_CASE expression t_COLON statement_list {
-      $$[0] = (new NodeCaseClause())->appendChild($2);
+      $$[0] = (new NodeCaseClause($2->lineno()))->appendChild($2);
       $$[1] = $4;
     }
 |   t_CASE expression t_COLON {
-      $$[0] = (new NodeCaseClause())->appendChild($2);
+      $$[0] = (new NodeCaseClause($2->lineno()))->appendChild($2);
       $$[1] = NULL;
     }
 ;
 
 default_clause:
-    t_DEFAULT t_COLON statement_list {
-      $$[0] = (new NodeDefaultClause());
-      $$[1] = $3;
+    default_label statement_list {
+      $$[0] = $1;
+      $$[1] = $2;
     }
-|   t_DEFAULT t_COLON {
-      $$[0] = (new NodeDefaultClause());
+|   default_label {
+      $$[0] = $1;
       $$[1] = NULL;
+    }
+;
+
+default_label:
+    t_DEFAULT t_COLON {
+      $$ = new NodeDefaultClause(yylineno);
     }
 ;
 
 labelled_statement:
     identifier t_COLON statement {
-      $$ = (new NodeLabel())->appendChild($1)->appendChild($3);
+      $$ = (new NodeLabel(yylineno))->appendChild($1)->appendChild($3);
     }
 ;
 
 throw_statement:
     t_THROW expression semicolon {
-      $$ = (new NodeStatementWithExpression(THROW))->appendChild($2);
+      $$ = (new NodeStatementWithExpression(THROW, yylineno))->appendChild($2);
     }
 ;
 
 try_statement:
     t_TRY block catch {
-      $$ = (new NodeTry())->appendChild($2)->appendChild($3[0])->appendChild($3[1])->appendChild(NULL);
+      $$ = (new NodeTry($2->lineno()))->appendChild($2)->appendChild($3[0])->appendChild($3[1])->appendChild(NULL);
     }
 |   t_TRY block finally {
-      $$ = (new NodeTry())->appendChild($2)->appendChild(NULL)->appendChild(NULL)->appendChild($3);
+      $$ = (new NodeTry($2->lineno()))->appendChild($2)->appendChild(NULL)->appendChild(NULL)->appendChild($3);
     }
 |   t_TRY block catch finally {
-      $$ = (new NodeTry())->appendChild($2)->appendChild($3[0])->appendChild($3[1])->appendChild($4);
+      $$ = (new NodeTry($2->lineno()))->appendChild($2)->appendChild($3[0])->appendChild($3[1])->appendChild($4);
     }
 ;
 
@@ -927,30 +934,30 @@ finally:
 // here, we go with ECMA-262.
 function_declaration:
     t_FUNCTION identifier t_LPAREN formal_parameter_list t_RPAREN t_LCURLY function_body t_RCURLY {
-      $$ = (new NodeFunction(true))->appendChild($2)->appendChild($4)->appendChild($7);
+      $$ = (new NodeFunction(true, $2->lineno()))->appendChild($2)->appendChild($4)->appendChild($7);
     }
 |   t_FUNCTION identifier t_LPAREN t_RPAREN t_LCURLY function_body t_RCURLY {
-      $$ = (new NodeFunction(true))->appendChild($2)->appendChild(new NodeArgList())->appendChild($6);
+      $$ = (new NodeFunction(true, $2->lineno()))->appendChild($2)->appendChild(new NodeArgList(yylineno))->appendChild($6);
     }
 ;
 function_expression:
     t_FUNCTION identifier t_LPAREN formal_parameter_list t_RPAREN t_LCURLY function_body t_RCURLY {
-      $$ = (new NodeFunction())->appendChild($2)->appendChild($4)->appendChild($7);
+      $$ = (new NodeFunction(false, $2->lineno()))->appendChild($2)->appendChild($4)->appendChild($7);
     }
 |   t_FUNCTION identifier t_LPAREN t_RPAREN t_LCURLY function_body t_RCURLY {
-      $$ = (new NodeFunction())->appendChild($2)->appendChild(new NodeArgList())->appendChild($6);
+      $$ = (new NodeFunction(false, $2->lineno()))->appendChild($2)->appendChild(new NodeArgList(yylineno))->appendChild($6);
     }
 |   t_FUNCTION t_LPAREN formal_parameter_list t_RPAREN t_LCURLY function_body t_RCURLY {
-      $$ = (new NodeFunction())->appendChild(NULL)->appendChild($3)->appendChild($6);
+      $$ = (new NodeFunction(false, $3->lineno()))->appendChild(NULL)->appendChild($3)->appendChild($6);
     }
 |   t_FUNCTION t_LPAREN t_RPAREN t_LCURLY function_body t_RCURLY {
-      $$ = (new NodeFunction())->appendChild(NULL)->appendChild(new NodeArgList())->appendChild($5);
+      $$ = (new NodeFunction(false, $5->lineno()))->appendChild(NULL)->appendChild(new NodeArgList(yylineno))->appendChild($5);
     }
 ;
 
 formal_parameter_list:
     identifier {
-      $$ = (new NodeArgList())->appendChild($1);
+      $$ = (new NodeArgList(yylineno))->appendChild($1);
     }
 |   formal_parameter_list t_COMMA identifier {
       $$ = $1->appendChild($3);
@@ -959,7 +966,7 @@ formal_parameter_list:
 
 function_body:
     /* empty */ {
-      $$ = new NodeStatementList();
+      $$ = new NodeStatementList(yylineno);
     }
 |   statement_list;
 ;
