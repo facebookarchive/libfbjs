@@ -44,9 +44,10 @@ void yyerror(YYLTYPE* yyloc, void* yyscanner, void* node, const char* str) {
 %glr-parser
 %error-verbose
 
-// 6: Confusion about *_no_in reductions, no merges should be required, GLR should be able to figure it out
-//%expect-rr 6
-//%expect 14
+// Confusion about *_no_in reductions, this is why we use GLR.
+%expect-rr 6
+// These might be legitimate, but I don't know...
+%expect 2
 
 %token t_LCURLY t_RCURLY
 %token t_LPAREN t_RPAREN
@@ -437,19 +438,19 @@ relational_expression:
 
 relational_expression_no_in:
     shift_expression
-|   relational_expression t_LESS_THAN shift_expression {
+|   relational_expression_no_in t_LESS_THAN shift_expression {
       $$ = (new NodeOperator(LESS_THAN, yylineno))->appendChild($1)->appendChild($3);
     }
-|   relational_expression t_GREATER_THAN shift_expression {
+|   relational_expression_no_in t_GREATER_THAN shift_expression {
       $$ = (new NodeOperator(GREATER_THAN, yylineno))->appendChild($1)->appendChild($3);
     }
-|   relational_expression t_LESS_THAN_EQUAL shift_expression {
+|   relational_expression_no_in t_LESS_THAN_EQUAL shift_expression {
       $$ = (new NodeOperator(LESS_THAN_EQUAL, yylineno))->appendChild($1)->appendChild($3);
     }
-|   relational_expression t_GREATER_THAN_EQUAL shift_expression {
+|   relational_expression_no_in t_GREATER_THAN_EQUAL shift_expression {
       $$ = (new NodeOperator(GREATER_THAN_EQUAL, yylineno))->appendChild($1)->appendChild($3);
     }
-|   relational_expression t_INSTANCEOF shift_expression {
+|   relational_expression_no_in t_INSTANCEOF shift_expression {
       $$ = (new NodeOperator(INSTANCEOF, yylineno))->appendChild($1)->appendChild($3);
     }
 ;
