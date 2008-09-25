@@ -38,7 +38,7 @@ namespace fbjs {
       virtual ~Node();
       virtual Node* clone(Node* node = NULL) const;
 
-      virtual Node* identifier(); // todo: kill this
+      virtual Node* identifier(); // TODO: kill this
       bool empty() const;
       unsigned int lineno() const;
 
@@ -334,7 +334,7 @@ namespace fbjs {
       NodeVarDeclaration(bool iterator = false, const unsigned int lineno = 0);
       virtual Node* clone(Node* node = NULL) const;
       virtual rope_t render(render_guts_t* guts, int indentation) const;
-      bool iterator() const;
+      bool iterator() const; // TODO: kill this
       Node* NodeVarDeclaration::setIterator(bool iterator);
   };
 
@@ -347,7 +347,7 @@ namespace fbjs {
       NodeFunction(bool declaration = false, const unsigned int lineno = 0);
       virtual Node* clone(Node* node = NULL) const;
       virtual rope_t render(render_guts_t* guts, int indentation) const;
-      bool declaration() const;
+      bool declaration() const; // TODO: kill this
   };
 
   //

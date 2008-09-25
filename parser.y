@@ -696,7 +696,7 @@ variable_statement:
 
 variable_declaration_list:
     variable_declaration {
-      $$ = (new NodeVarDeclaration(true, yylineno))->appendChild($1);
+      $$ = (new NodeVarDeclaration(false, yylineno))->appendChild($1);
     }
 |   variable_declaration_list t_COMMA variable_declaration {
       $$->appendChild($3);
