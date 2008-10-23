@@ -369,6 +369,15 @@ namespace fbjs {
   };
 
   //
+  // NodeWith
+  class NodeWith: public Node {
+    public:
+      NodeWith(const unsigned int lineno = 0);
+      virtual Node* clone(Node* node = NULL) const;
+      virtual rope_t render(render_guts_t* guts, int indentation) const;
+  };
+
+  //
   // NodeTry
   class NodeTry: public Node {
     public:

@@ -809,7 +809,7 @@ return_statement:
 
 with_statement:
     t_WITH t_LPAREN expression t_RPAREN statement {
-      parsererror("with(){} statements are not supported.");
+      $$ = (new NodeWith($3->lineno()))->appendChild($3)->appendChild($5);
     }
 ;
 

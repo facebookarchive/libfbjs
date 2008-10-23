@@ -2,8 +2,8 @@
 using namespace fbjs;
 
 //
-// Node: All other node inherit from this. There should only be one instance
-//       a Node -- the root node.
+// Node: All other nodes inherit from this. There should only be one instance
+//       of a Node -- the root node.
 Node::Node(const unsigned int lineno /* = 0 */) : _lineno(lineno) {}
 
 Node::~Node() {
@@ -70,14 +70,12 @@ rope_t Node::render(render_guts_t* guts, int indentation) const {
 }
 
 rope_t Node::renderBlock(bool must, render_guts_t* guts, int indentation) const {
-  if (!must && this->empty()) {
-    return rope_t(";");
-  } else if (!must && !guts->pretty && this->_childNodes.front() == this->_childNodes.back()) {
+  if (!must && !guts->pretty) {
     rope_t ret;
     if (guts->sanelineno) {
       this->renderLinenoCatchup(guts, ret);
     }
-    ret += this->_childNodes.front()->renderStatement(guts, indentation);
+    ret += this->renderStatement(guts, indentation);
     return ret;
   } else {
     rope_t ret(guts->pretty ? " {" : "{");
@@ -178,8 +176,32 @@ rope_t NodeStatementList::render(render_guts_t* guts, int indentation) const {
 rope_t NodeStatementList::renderBlock(bool must, render_guts_t* guts, int indentation) const {
   if (!must && this->empty()) {
     return rope_t(";");
+  } else if (!must && !guts->pretty && this->_childNodes.front() == this->_childNodes.back()) {
+    rope_t ret;
+    if (guts->sanelineno) {
+      this->renderLinenoCatchup(guts, ret);
+    }
+    ret += this->_childNodes.front()->renderStatement(guts, indentation);
+    return ret;
   } else {
-    return Node::renderBlock(must, guts, indentation);
+    rope_t ret(guts->pretty ? " {" : "{");
+    ret += this->renderIndentedStatement(guts, indentation + 1);
+    if (guts->pretty || guts->sanelineno) {
+      bool newline;
+      if (guts->sanelineno) {
+        newline = this->renderLinenoCatchup(guts, ret);
+      } else {
+        ret += "\n";
+        newline = true;
+      }
+      if (guts->pretty && newline) {
+        for (int i = 0; i < indentation; ++i) {
+          ret += "  ";
+        }
+      }
+    }
+    ret += "}";
+    return ret;
   }
 }
 
@@ -698,6 +720,23 @@ rope_t NodeIf::render(render_guts_t* guts, int indentation) const {
       ret += (*node)->renderBlock(false, guts, indentation);
     }
   }
+  return ret;
+}
+
+//
+// NodeWith: with (foo) { bar(); };
+NodeWith::NodeWith(const unsigned int lineno /* = 0 */) : Node(lineno) {}
+Node* NodeWith::clone(Node* node) const {
+  return Node::clone(new NodeWith());
+}
+
+rope_t NodeWith::render(render_guts_t* guts, int indentation) const {
+  rope_t ret;
+  node_list_t::const_iterator node = this->_childNodes.begin();
+  ret += guts->pretty ? "with (" : "with(";
+  ret += (*node)->render(guts, indentation);
+  ret += ")";
+  ret += (*++node)->renderBlock(false, guts, indentation);
   return ret;
 }
 

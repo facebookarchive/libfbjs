@@ -41,7 +41,7 @@ Node* fbjsize(Node* node, fbjsize_guts_t* guts) {
     }
 
   } else if (typeid(*node) == typeid(NodeFunctionConstructor)) {
-/*
+
     // Turn `new foo(1, 2)' into: `fbjs.alloc(foo, [1, 2])'
     node_list_t::iterator func = node->childNodes().begin();
     Node* args = new NodeArrayLiteral();
@@ -59,7 +59,7 @@ Node* fbjsize(Node* node, fbjsize_guts_t* guts) {
         ->appendChild(constructor)
         ->appendChild(args),
         guts));
-*/
+
   } else if (typeid(*node) == typeid(NodeFunction)) {
 
     // For each function we enter we put a new scope on the stack with all its local variables

@@ -7,14 +7,14 @@
 int main(int argc, char* argv[]) {
 
   // Mutate
-  Node* root = new Node(stdin);
+  Node* root = argc > 1 ? new Node(fopen(argv[1], "r")) : new Node(stdin);
   fbjsize_guts_t guts;
   guts.app_id = argc > 1 ? argv[1] : "123";
   guts.forinid = 0;
   root = fbjsize(root, &guts);
 
   // Render
-  rope_t rendered = root->render(RENDER_PRETTY | RENDER_MAINTAIN_LINENO);
+  rope_t rendered = root->render(RENDER_PRETTY/* | RENDER_MAINTAIN_LINENO*/);
   delete root;
   std::cout<<rendered;
   printf("\n");

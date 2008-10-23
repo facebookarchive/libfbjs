@@ -82,21 +82,24 @@ FBJSBEGIN(IDENTIFIER);
     return parsertok(t_CATCH);
   }
   "else" {
-    if (yyextra->last_tok != t_RCURLY && yyextra->last_tok != t_SEMICOLON) {
+    if ((yyextra->last_tok == t_RPAREN && (yyextra->last_paren_tok == t_IF || yyextra->last_paren_tok == t_FOR || yyextra->last_paren_tok == t_WHILE)) ||
+        yyextra->last_tok == t_SEMICOLON || yyextra->last_tok == t_RCURLY) {
+      return parsertok(t_ELSE);
+    } else {
       NEVERMIND;
       FBJSBEGIN(INITIAL);
       return t_VIRTUAL_SEMICOLON;
-    } else {
-      return parsertok(t_ELSE);
     }
   }
   "while" {
-    if ((yyextra->last_tok != t_RCURLY || yyextra->last_curly_tok != t_DO) && yyextra->last_tok != t_SEMICOLON) {
+    if ((yyextra->last_tok == t_RPAREN && (yyextra->last_paren_tok == t_IF || yyextra->last_paren_tok == t_FOR || yyextra->last_paren_tok == t_WHILE)) ||
+        (yyextra->last_tok == t_RCURLY && yyextra->last_curly_tok == t_DO) ||
+        yyextra->last_tok == t_SEMICOLON || yyextra->last_tok == t_RCURLY) {
+      return parsertok(t_WHILE);
+    } else {
       NEVERMIND;
       FBJSBEGIN(INITIAL);
       return t_VIRTUAL_SEMICOLON;
-    } else {
-      return parsertok(t_WHILE);
     }
   }
   "finally" {
@@ -108,7 +111,8 @@ FBJSBEGIN(IDENTIFIER);
   [a-zA-Z$_0-9]+ {
     NEVERMIND;
     if (yyextra->last_tok == t_RPAREN &&
-        (yyextra->last_paren_tok == t_IF || yyextra->last_paren_tok == t_DO || yyextra->last_paren_tok == t_FOR)) {
+        (yyextra->last_paren_tok == t_IF || yyextra->last_paren_tok == t_DO || yyextra->last_paren_tok == t_FOR ||
+         (yyextra->last_paren_tok == t_WHILE && yyextra->last_curly_tok != t_DO))) {
       FBJSBEGIN(INITIAL);
     } else {
       FBJSBEGIN(INITIAL);
@@ -290,7 +294,7 @@ FBJSBEGIN(IDENTIFIER);
 ">>"   return parsertok(t_RSHIFT);
 "+="   return parsertok(t_PLUS_ASSIGN);
 "-="   return parsertok(t_MINUS_ASSIGN);
-"/="   return parsertok(t_DIV_ASSIGN);
+<INITIAL,VIRTUAL_SEMICOLON>"/=" return parsertok(t_DIV_ASSIGN);
 "*="   return parsertok(t_MULT_ASSIGN);
 "%="   return parsertok(t_MOD_ASSIGN);
 "&="   return parsertok(t_BIT_AND_ASSIGN);
