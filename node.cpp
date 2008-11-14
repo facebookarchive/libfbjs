@@ -445,11 +445,12 @@ Node* NodeConditionalExpression::clone(Node* node) const {
 
 rope_t NodeConditionalExpression::render(render_guts_t* guts, int indentation) const {
   node_list_t::const_iterator node = this->_childNodes.begin();
-  return rope_t((*node)->render(guts, indentation)) +
-    (guts->pretty ? " ? " : "?") +
+  rope_t ret((*node)->render(guts, indentation));
+  ret += rope_t(guts->pretty ? " ? " : "?") +
     (*++node)->render(guts, indentation) +
-    (guts->pretty ? " : " : ":") +
-    (*++node)->render(guts, indentation);
+    (guts->pretty ? " : " : ":");
+  ret += (*++node)->render(guts, indentation);
+  return ret;
 }
 
 //
@@ -538,6 +539,10 @@ rope_t NodeAssignment::render(render_guts_t* guts, int indentation) const {
   return ret;
 }
 
+const node_assignment_t NodeAssignment::operatorType() const {
+  return this->op;
+}
+
 //
 // NodeUnary
 NodeUnary::NodeUnary(node_unary_t op, const unsigned int lineno /* = 0 */) : NodeExpression(lineno), op(op) {}
@@ -588,7 +593,7 @@ rope_t NodeUnary::render(render_guts_t* guts, int indentation) const {
   return ret;
 }
 
-const node_assignment_t NodeAssignment::operatorType() const {
+const node_unary_t NodeUnary::operatorType() const {
   return this->op;
 }
 
@@ -816,7 +821,11 @@ Node* NodeLabel::clone(Node* node) const {
 }
 
 rope_t NodeLabel::render(render_guts_t* guts, int indentation) const {
-  return rope_t(this->_childNodes.front()->render(guts, indentation)) + ":" + this->_childNodes.back()->render(guts, indentation);
+  return rope_t(this->_childNodes.front()->render(guts, indentation)) + (guts->pretty ? ": " : ":") + this->_childNodes.back()->render(guts, indentation);
+}
+
+rope_t NodeLabel::renderStatement(render_guts_t* guts, int indentation) const {
+  return this->render(guts, indentation) + ";";
 }
 
 //
@@ -901,7 +910,7 @@ Node* NodeObjectLiteralProperty::clone(Node* node) const {
 }
 
 rope_t NodeObjectLiteralProperty::render(render_guts_t* guts, int indentation) const {
-  return rope_t(this->_childNodes.front()->render(guts, indentation)) + ":" +
+  return rope_t(this->_childNodes.front()->render(guts, indentation)) + (guts->pretty ? ": " : ":") +
     this->_childNodes.back()->render(guts, indentation);
 }
 

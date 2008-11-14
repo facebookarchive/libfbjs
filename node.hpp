@@ -213,6 +213,7 @@ namespace fbjs {
       NodeUnary(node_unary_t op, const unsigned int lineno = 0);
       virtual Node* clone(Node* node = NULL) const;
       virtual rope_t render(render_guts_t* guts, int indentation) const;
+      const node_unary_t operatorType() const;
   };
 
   //
@@ -393,6 +394,7 @@ namespace fbjs {
       NodeLabel(const unsigned int lineno = 0);
       virtual Node* clone(Node* node = NULL) const;
       virtual rope_t render(render_guts_t* guts, int indentation) const;
+      virtual rope_t renderStatement(render_guts_t* guts, int indentation) const;
   };
 
   //
