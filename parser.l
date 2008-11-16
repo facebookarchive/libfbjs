@@ -138,16 +138,7 @@ FBJSBEGIN(IDENTIFIER);
   "else"  return parsertok(t_ELSE);
   "finally"  return parsertok(t_FINALLY);
   "for"  return parsertok(t_FOR);
-  "function" {
-    // This is a hack to get this working in Bison. ExpressionStatements may not begin with t_FUNCTION
-    if (yyextra->last_tok != t_LCURLY && yyextra->last_tok != t_RCURLY && yyextra->last_tok != t_RPAREN &&
-        yyextra->last_tok != t_ELSE && yyextra->last_tok != t_FUNCTION_HACK && yyextra->last_tok != t_SEMICOLON &&
-        yyextra->last_tok != t_VIRTUAL_SEMICOLON && yyextra->last_tok != 0) {
-      NEVERMIND;
-      return parsertok(t_FUNCTION_HACK);
-    }
-    return parsertok(t_FUNCTION);
-  }
+  "function" return parsertok(t_FUNCTION);
   "if"  return parsertok(t_IF);
   "in"  return parsertok(t_IN);
   "instanceof"  return parsertok(t_INSTANCEOF);
@@ -225,22 +216,12 @@ FBJSBEGIN(IDENTIFIER);
 <IDENTIFIER>"/" FBJSBEGIN(REGEX);
 <REGEX>(\[([^\]\\]+|\\.)+\]|\\.|[^\/\\])*"/"[A-Za-z]* {
   size_t len = strlen(yytext);
-  yylval->string = (char*)malloc(len + 2);
-  yylval->string[0] = '/';
-  memcpy(yylval->string + 1, yytext, len + 1);
+  yylval->string = (char*)malloc(len); // last char is a /, which will become a NULL, len is sufficient memory
+  memcpy(yylval->string, yytext, len - 1);
+  yylval->string[len - 1] = 0;
   return parsertok(t_REGEX);
 }
 "{" {
-  // More fun hackiness to get this working in Bison
-  // Blocks are only valid after t_LCURLY t_RCURLY t_RPAREN t_TRY t_CATCH t_FINALLY, and luckily there
-  // and no cases where an object literal would be allowed there.
-  if (yyextra->last_tok != t_LCURLY && yyextra->last_tok != t_RCURLY && yyextra->last_tok != t_RPAREN &&
-      yyextra->last_tok != t_TRY && yyextra->last_tok != t_CATCH && yyextra->last_tok != t_FINALLY &&
-      yyextra->last_tok != t_ELSE && yyextra->last_tok != t_DO && yyextra->last_tok != t_SEMICOLON &&
-      yyextra->last_tok != t_VIRTUAL_SEMICOLON && yyextra->last_tok != 0 && yyextra->last_tok != t_OBJECT_LITERAL_HACK) {
-    NEVERMIND;
-    return parsertok(t_OBJECT_LITERAL_HACK);
-  }
   yyextra->curly_stack.push(yyextra->last_tok);
   return parsertok(t_LCURLY);
 }

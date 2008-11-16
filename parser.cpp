@@ -1,9 +1,10 @@
 #include "node.hpp"
 #include "parser.hpp"
-
 #ifdef DEBUG_BISON
 extern int yydebug;
 #endif
+using namespace std;
+using namespace fbjs;
 
 ParseException::ParseException(const string msg) {
   memcpy(error, msg.c_str(), msg.length() > 127 ? 128 : msg.length() + 1);

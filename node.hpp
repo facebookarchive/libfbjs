@@ -6,12 +6,11 @@
 #include <list>
 #include <ext/rope>
 
-using namespace std;
 typedef __gnu_cxx::rope<char> rope_t;
 
 namespace fbjs {
   class Node;
-  typedef list<Node*> node_list_t;
+  typedef std::list<Node*> node_list_t;
   enum node_render_enum {
     RENDER_NONE = 0,
     RENDER_PRETTY = 1,
@@ -93,10 +92,21 @@ namespace fbjs {
   // NodeStringLiteral
   class NodeStringLiteral: public NodeExpression {
     protected:
-      string value;
+      std::string value;
       bool quoted;
     public:
-      NodeStringLiteral(string value, bool quoted, const unsigned int lineno = 0);
+      NodeStringLiteral(std::string value, bool quoted, const unsigned int lineno = 0);
+      virtual Node* clone(Node* node = NULL) const;
+      virtual rope_t render(render_guts_t* guts, int indentation) const;
+  };
+
+  //
+  // NodeRegexLiteral
+  class NodeRegexLiteral: public NodeExpression {
+    protected:
+      std::string value;
+    public:
+      NodeRegexLiteral(std::string value, const unsigned int lineno = 0);
       virtual Node* clone(Node* node = NULL) const;
       virtual rope_t render(render_guts_t* guts, int indentation) const;
   };
@@ -234,12 +244,12 @@ namespace fbjs {
   // NodeIdentifier
   class NodeIdentifier: public NodeExpression {
     protected:
-      string _name;
+      std::string _name;
     public:
-      NodeIdentifier(string name, const unsigned int lineno = 0);
+      NodeIdentifier(std::string name, const unsigned int lineno = 0);
       virtual Node* clone(Node* node = NULL) const;
       virtual rope_t render(render_guts_t* guts, int indentation) const;
-      virtual string name() const;
+      virtual std::string name() const;
       virtual Node* identifier();
   };
 

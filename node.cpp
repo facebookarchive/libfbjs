@@ -1,4 +1,5 @@
 #include "node.hpp"
+using namespace std;
 using namespace fbjs;
 
 //
@@ -265,6 +266,18 @@ rope_t NodeStringLiteral::render(render_guts_t* guts, int indentation) const {
   } else {
     return rope_t("\"") + this->value.c_str() + "\"";
   }
+}
+
+//
+// NodeRegexLiteral: /foo|bar/
+NodeRegexLiteral::NodeRegexLiteral(string value, const unsigned int lineno /* = 0 */) : NodeExpression(lineno), value(value) {}
+
+Node* NodeRegexLiteral::clone(Node* node) const {
+  return new NodeRegexLiteral(this->value);
+}
+
+rope_t NodeRegexLiteral::render(render_guts_t* guts, int indentation) const {
+  return rope_t("/") + this->value.c_str() + "/";
 }
 
 //
