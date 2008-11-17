@@ -3,8 +3,7 @@ using namespace std;
 using namespace fbjs;
 
 //
-// Node: All other nodes inherit from this. There should only be one instance
-//       of a Node -- the root node.
+// Node: All other nodes inherit from this.
 Node::Node(const unsigned int lineno /* = 0 */) : _lineno(lineno) {}
 
 Node::~Node() {
@@ -27,6 +26,11 @@ Node* Node::clone(Node* node) const {
 
 Node* Node::appendChild(Node* node) {
   this->_childNodes.push_back(node);
+  return this;
+}
+
+Node* Node::prependChild(Node* node) {
+  this->_childNodes.push_front(node);
   return this;
 }
 
@@ -155,6 +159,13 @@ Node* Node::identifier() {
 
 unsigned int  Node::lineno() const {
   return this->_lineno;
+}
+
+//
+// NodeProgram: a javascript program
+NodeProgram::NodeProgram() : Node(1) {}
+Node* NodeProgram::clone(Node* node) const {
+  return Node::clone(new NodeProgram());
 }
 
 //
@@ -663,27 +674,39 @@ rope_t NodeArgList::render(render_guts_t* guts, int indentation) const {
 }
 
 //
-// NodeFunction: a function definition
-NodeFunction::NodeFunction(bool declaration /* = false */, const unsigned int lineno /* = 0 */) : Node(lineno), _declaration(declaration) {}
+// NodeFunctionDeclaration: brings a function into scope
+NodeFunctionDeclaration::NodeFunctionDeclaration(const unsigned int lineno /* = 0 */) : Node(lineno) {}
 
-Node* NodeFunction::clone(Node* node) const {
-  return Node::clone(new NodeFunction());
+Node* NodeFunctionDeclaration::clone(Node* node) const {
+  return Node::clone(new NodeFunctionDeclaration());
 }
 
-bool NodeFunction::declaration() const {
-  return this->_declaration;
+rope_t NodeFunctionDeclaration::render(render_guts_t* guts, int indentation) const {
+  rope_t ret;
+  node_list_t::const_iterator node = this->_childNodes.begin();
+
+  ret += rope_t("function ") + (*node)->render(guts, indentation);
+  ret += (*++node)->render(guts, indentation);
+  ret += (*++node)->renderBlock(true, guts, indentation);
+  return ret;
 }
 
-rope_t NodeFunction::render(render_guts_t* guts, int indentation) const {
+//
+// NodeFunctionExpression: returns a function
+NodeFunctionExpression::NodeFunctionExpression(const unsigned int lineno /* = 0 */) : NodeExpression(lineno) {}
+
+Node* NodeFunctionExpression::clone(Node* node) const {
+  return Node::clone(new NodeFunctionExpression());
+}
+
+rope_t NodeFunctionExpression::render(render_guts_t* guts, int indentation) const {
   rope_t ret;
   node_list_t::const_iterator node = this->_childNodes.begin();
 
   ret += "function";
   if (*node != NULL) {
-    ret += " ";
-    ret += (*node)->render(guts, indentation);
+    ret += rope_t(" ") + (*node)->render(guts, indentation);
   }
-
   ret += (*++node)->render(guts, indentation);
   ret += (*++node)->renderBlock(true, guts, indentation);
   return ret;

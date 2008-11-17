@@ -15,7 +15,7 @@ const char* ParseException::what() const throw() {
   return error;
 }
 
-Node::Node(FILE* file) {
+NodeProgram::NodeProgram(FILE* file) {
 
   // Initialize the scanner.
   void* scanner;

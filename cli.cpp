@@ -7,7 +7,7 @@
 int main(int argc, char* argv[]) {
 
   // Mutate
-  Node* root = argc > 1 ? new Node(fopen(argv[1], "r")) : new Node(stdin);
+  Node* root = argc > 1 ? new NodeProgram(fopen(argv[1], "r")) : new NodeProgram(stdin);
   fbjsize_guts_t guts;
   guts.app_id = argc > 1 ? argv[1] : "123";
   guts.forinid = 0;

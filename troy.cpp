@@ -67,7 +67,7 @@ int main(int argc, char* argv[]) {
     ->appendChild((new NodeFunctionCall())
       ->appendChild(new NodeIdentifier("$ctx"))
       ->appendChild((new NodeArgList())
-        ->appendChild((new NodeFunction())
+        ->appendChild((new NodeFunctionExpression())
           ->appendChild(NULL)
           ->appendChild(new NodeArgList())
           ->appendChild(body))))
@@ -81,7 +81,7 @@ int main(int argc, char* argv[]) {
   }
   Node* root = (new NodeFunctionCall())
     ->appendChild((new NodeParenthetical()) // hack to cast from FunctionDeclaration to FunctionExpression
-      ->appendChild((new NodeFunction())
+      ->appendChild((new NodeFunctionExpression())
         ->appendChild(NULL)
         ->appendChild(new NodeArgList())
         ->appendChild(box->appendChild(body))))
@@ -98,7 +98,7 @@ Node* parseresource(char* filename) {
   if (!file) {
     throw string("Failed to open: ")+filename;
   }
-  Node* root = new Node(file);
+  Node* root = new NodeProgram(file);
   fclose(file);
   return root;
 }
@@ -108,28 +108,34 @@ Node* externalize(Node* node) {
     return node;
   }
 
-  if (typeid(*node) == typeid(NodeFunction)) {
+  if (typeid(*node) == typeid(NodeFunctionExpression) || typeid(*node) == typeid(NodeFunctionDeclaration)) {
 
-    // Anonymous functions vs. named functions are a little tricky
-    Node* ret = new Node();
+    Node* func;
     Node* name = NULL;
+    if (typeid(*node) == typeid(NodeFunctionDeclaration)) {
 
-    // Function name
-    if (node->childNodes().front() != NULL) {
-      name = node->replaceChild(NULL, node->childNodes().begin());
+      // Cast FunctionDeclaration's to FunctionExpression
+      name = node->removeChild(node->childNodes().begin());
+      func = (new NodeFunctionExpression())
+        ->appendChild(name)
+        ->appendChild(node->removeChild(node->childNodes().begin()));
+      func->appendChild(node->removeChild(node->childNodes().begin()));
+      delete node;
+    } else {
+      func = node;
     }
 
     // Put all functions into the $ctx wrapper
-    ret = (new NodeFunctionCall())
+    Node* ret = (new NodeFunctionCall())
       ->appendChild(new NodeIdentifier("$ctx"))
       ->appendChild((new NodeArgList())
-        ->appendChild(node));
+        ->appendChild(func));
 
     // If the function was a declaration, it must now be a local variable.
-    if (static_cast<NodeFunction*>(node)->declaration()) {
+    if (typeid(*node) == typeid(NodeFunctionDeclaration)) {
       ret = (new NodeVarDeclaration())
         ->appendChild((new NodeAssignment(ASSIGN))
-          ->appendChild(name)
+          ->appendChild(name->clone())
           ->appendChild(ret));
     }
     return ret;

@@ -13,6 +13,114 @@ Node* fbjsize(Node* node, fbjsize_guts_t* guts) {
     delete node;
     return ret;
 
+  } else if (typeid(*node) == typeid(NodeProgram) || typeid(*node) == typeid(NodeFunctionDeclaration) || typeid(*node) == typeid(NodeFunctionExpression)) {
+
+    // For each function we enter we put a new scope on the stack with all its local variables
+    bool program = typeid(*node) == typeid(NodeProgram);
+    scope_t scope;
+    scope_t implied;
+    Node* name = NULL;
+    Node* statements = NULL;
+    Node* args;
+
+    if (!program) {
+
+      // Grab the function's name
+      node_list_t::iterator func = node->childNodes().begin();
+      if ((*func) != NULL) {
+        name = new NodeStringLiteral(static_cast<NodeIdentifier*>(*func)->name(), false);
+      }
+
+      // Formal parameters
+      args = node->removeChild(++func);
+      for (node_list_t::iterator arg = args->childNodes().begin(); args->childNodes().end() != arg; ++arg) {
+        scope.insert(static_cast<NodeIdentifier*>(*arg)->name());
+        implied.insert(static_cast<NodeIdentifier*>(*arg)->name());
+      }
+      statements = node->removeChild(++func);
+      delete node;
+    } else {
+      statements = node->childNodes().front();
+    }
+
+    // Analyze local variables
+    if (!program) {
+      fbjs_analyze_scope(statements, &scope);
+      guts->scope.push_back(&scope);
+    }
+
+    // Remove FunctionDeclaration (fbjs_declare_functions runs fbjsize on those)
+    Node* vars;
+    if (program) {
+      vars = new NodeStatementList();
+    } else {
+      vars = new NodeVarDeclaration();
+    }
+    fbjs_declare_functions(statements, vars, &implied, guts);
+    if (!program) {
+      // Put each local variable that's also not a declaration into the var declaration
+      for (scope_t::iterator ii = scope.begin(); ii != scope.end(); ++ii) {
+        if (!implied.count(*ii)) {
+          vars->appendChild(new NodeIdentifier("_$" + *ii));
+        }
+      }
+    }
+
+    // fbjsize everything else
+    statements = fbjsize(statements, guts);
+    if (!program) {
+      args = fbjsize(args, guts);
+      guts->scope.pop_back();
+    }
+
+    // Insert declarations at the beginning
+    if (vars->childNodes().empty()) {
+      delete vars;
+    } else {
+      if (statements->childNodes().empty()) {
+        statements->appendChild(vars);
+      } else {
+        statements->insertBefore(vars, statements->childNodes().begin());
+      }
+    }
+
+    // Abort early for programs, but there's more to do for functions
+    if (program) {
+      return node;
+    }
+
+
+    // Wrap the function in FBJS.ctx
+    Node* ret;
+    node = (new NodeFunctionExpression())
+      ->appendChild(NULL)
+      ->appendChild(args)
+      ->appendChild(statements);
+    if (name == NULL) {
+      ret = fbjs_runtime_node("ctx", 1, node);
+    } else {
+      ret = fbjs_runtime_node("ctx", 2, node, name);
+    }
+
+    // If the function exists in a with() block we need to create a closure
+    if (!guts->with_depth.empty()) {
+      Node* arguments = new NodeArgList();
+      for (size_t ii = guts->with_depth.size(); ii; --ii) {
+        char buf[32];
+        sprintf(buf, "ws%x", (unsigned int)(ii - 1));
+        arguments->appendChild(new NodeIdentifier(buf));
+      }
+      ret = (new NodeFunctionCall())
+        ->appendChild((new NodeFunctionExpression())
+          ->appendChild(NULL)
+          ->appendChild(arguments)
+          ->appendChild((new NodeStatementList())
+            ->appendChild((new NodeStatementWithExpression(RETURN))
+              ->appendChild(ret))))
+        ->appendChild(arguments->clone());
+    }
+    return ret;
+
   } else if (typeid(*node) == typeid(NodeVarDeclaration)) {
 
     // Special-case for `for (var ii in dict);'
@@ -60,105 +168,6 @@ Node* fbjsize(Node* node, fbjsize_guts_t* guts) {
         ->appendChild(constructor)
         ->appendChild(args),
         guts));
-
-  } else if (typeid(*node) == typeid(NodeFunction)) {
-
-    // For each function we enter we put a new scope on the stack with all its local variables
-    bool root = guts->scope.empty();
-    scope_t* scope = new scope_t();
-    string* name = NULL;
-    node_list_t::iterator func = node->childNodes().begin();
-
-    // Function name
-    if ((*func) != NULL) {
-      name = new string(static_cast<NodeIdentifier*>(*func)->name());
-    }
-
-    // Extract local `var's defined inside the function body
-    Node* args = *++func;
-    fbjs_analyze_scope(*++func, scope);
-    Node* vars = new NodeVarDeclaration();
-    for (scope_t::iterator scopei = scope->begin(); scopei != scope->end(); ++scopei) {
-      vars->appendChild(new NodeIdentifier("_$" + *scopei));
-    }
-
-    // Formal parameters
-    for (node_list_t::iterator arg = args->childNodes().begin(); args->childNodes().end() != arg; ++arg) {
-      scope->insert(static_cast<NodeIdentifier*>(*arg)->name());
-    }
-
-    // fbjsize the function body
-    guts->scope.push_back(scope);
-    Node* body = fbjsize(*func, guts);
-    fbjsize(args, guts);
-    assert(body == *func);
-    guts->scope.pop_back();
-    delete scope;
-
-    // Inject the `var' preface
-    if (!vars->empty()) {
-      body->insertBefore(vars, body->childNodes().begin());
-    } else {
-      delete vars;
-    }
-
-    // First we wrap the function in fbjs.ctx
-    Node* ret_node = (new NodeFunctionCall())
-      ->appendChild((new NodeStaticMemberExpression())
-        ->appendChild(new NodeIdentifier("FBJS"))
-        ->appendChild(new NodeIdentifier("ctx")))
-      ->appendChild(args = (new NodeArgList())
-        ->appendChild(node));
-    if (name != NULL) {
-      args->appendChild(new NodeStringLiteral(*name, false));
-    }
-
-    // If it's global we return $FBJS.name = function(){}.
-    // If it's a local function we change the name to $_name.
-    bool declaration = static_cast<NodeFunction*>(node)->declaration();
-    if (declaration) {
-      delete node->replaceChild(NULL, node->childNodes().begin());
-      if (root) {
-        ret_node = (new NodeAssignment(ASSIGN))
-          ->appendChild((new NodeStaticMemberExpression())
-            ->appendChild(new NodeIdentifier("$FBJS"))
-            ->appendChild(new NodeIdentifier(*name)))
-          ->appendChild(ret_node);
-      } else {
-        ret_node = (new NodeAssignment(ASSIGN))
-          ->appendChild(new NodeIdentifier("_$" + *name))
-          ->appendChild(ret_node);
-      }
-    } else {
-      if (name != NULL) {
-        delete node->replaceChild(NULL, node->childNodes().begin());
-      }
-    }
-    if (name != NULL) {
-      delete name;
-    }
-
-    // Finally if the function exists in a with() block we need to create a closure
-    if (!guts->with_depth.empty()) {
-      Node* arguments = new NodeArgList();
-      for (size_t ii = guts->with_depth.size(); ii; --ii) {
-        char buf[32];
-        sprintf(buf, "ws%x", (unsigned int)(ii - 1));
-        arguments->appendChild(new NodeIdentifier(buf));
-      }
-      ret_node = (new NodeFunctionCall())
-        ->appendChild((new NodeFunction())
-          ->appendChild(NULL)
-          ->appendChild(arguments)
-          ->appendChild((new NodeStatementList())
-            ->appendChild((new NodeStatementWithExpression(RETURN))
-              ->appendChild(ret_node))))
-        ->appendChild(arguments->clone());
-      if (declaration) {
-        ret_node = (new NodeUnary(VOID))->appendChild(ret_node);
-      }
-    }
-    return ret_node;
 
   } else if (typeid(*node) == typeid(NodeWith)) {
 
@@ -558,7 +567,7 @@ Node* fbjs_with_identifier(string name, bool for_assignment, fbjsize_guts_t* gut
   }
 
   // Return a call to FBJS.with
-  return fbjs_runtime_node("with", 3, args, local == NULL ? new NodeBooleanLiteral(false) : local->clone(), new NodeStringLiteral(name, false));
+  return fbjs_runtime_node("scope", 3, args, local == NULL ? new NodeBooleanLiteral(false) : local->clone(), new NodeStringLiteral(name, false));
 }
 
 node_pair_t fbjs_split_member_expression(Node* expr, fbjsize_guts_t* guts) {
@@ -615,14 +624,14 @@ node_operator_t fbjs_assignment_op_to_expr_op(node_assignment_t op) {
   }
 }
 
-void fbjs_analyze_scope(Node* node, scope_t* scope, const bool first /* = true */) {
+void fbjs_analyze_scope(Node* node, scope_t* scope) {
 
-  if (!first && typeid(*node) == typeid(NodeFunction)) {
+  if (typeid(*node) == typeid(NodeFunctionDeclaration)) {
 
     // Don't recurse into more functions, but add local declarations to scope
-    if (static_cast<NodeFunction*>(node)->declaration()) {
-      scope->insert(static_cast<NodeIdentifier*>(*(node->childNodes().begin()))->name());
-    }
+    // NOTE: We only look at NodeFunctionDeclaration because while NodeFunctionExpression's
+    //       can have names, they don't actually do much.
+    scope->insert(static_cast<NodeIdentifier*>(*(node->childNodes().begin()))->name());
   } else if (typeid(*node) == typeid(NodeVarDeclaration)) {
 
     // Mark all `var' declarations as local to this scope
@@ -640,9 +649,45 @@ void fbjs_analyze_scope(Node* node, scope_t* scope, const bool first /* = true *
     // Iterate over all children and look for identifiers
     for (node_list_t::const_iterator i = node->childNodes().begin(); i != node->childNodes().end(); ++i) {
       if (*i != NULL) {
-        fbjs_analyze_scope(*i, scope, false);
+        fbjs_analyze_scope(*i, scope);
       }
     }
+  }
+}
+
+bool fbjs_declare_functions(Node* node, Node* decl, scope_t* scope, fbjsize_guts_t* guts) {
+
+  if (typeid(*node) == typeid(NodeFunctionDeclaration)) {
+
+    // Change this to an Assignment and FunctionExpression, then fbjsize that
+    Node* identifier = node->removeChild(node->childNodes().begin());
+    scope->insert(static_cast<NodeIdentifier*>(identifier)->name());
+    Node* func = (new NodeFunctionExpression())
+      ->appendChild(NULL)
+      ->appendChild(node->removeChild(node->childNodes().begin()));
+    func->appendChild(node->removeChild(node->childNodes().begin()));
+    decl->appendChild(fbjsize((new NodeAssignment(ASSIGN))
+      ->appendChild(identifier)
+      ->appendChild(func), guts));
+    delete node;
+    return false;
+
+  } else if (typeid(*node) == typeid(NodeFunctionExpression)) {
+
+    // Leave FunctionExpression's alone and also don't recurse into them
+    return true;
+  } else {
+
+    // Iterate over all children, remove declared functions
+    node_list_t::iterator ii = node->childNodes().begin();
+    while (ii != node->childNodes().end()) {
+      if (*ii != NULL && !fbjs_declare_functions(*ii, decl, scope, guts)) {
+        node->removeChild(ii++);
+      } else {
+        ++ii;
+      }
+    }
+    return true;
   }
 }
 

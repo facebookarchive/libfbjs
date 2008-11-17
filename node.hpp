@@ -32,8 +32,6 @@ namespace fbjs {
 
     public:
       Node(const unsigned int lineno = 0);
-      Node(const char* code);
-      Node(FILE* file);
       virtual ~Node();
       virtual Node* clone(Node* node = NULL) const;
 
@@ -43,6 +41,7 @@ namespace fbjs {
 
       node_list_t& Node::childNodes();
       Node* appendChild(Node* node);
+      Node* prependChild(Node* node);
       Node* removeChild(node_list_t::iterator node_pos);
       Node* replaceChild(Node* node, node_list_t::iterator node_pos);
       Node* insertBefore(Node* node, node_list_t::iterator node_pos);
@@ -54,6 +53,16 @@ namespace fbjs {
       virtual rope_t renderStatement(render_guts_t* guts, int indentation) const;
       virtual rope_t renderIndentedStatement(render_guts_t* guts, int indentation) const;
       bool renderLinenoCatchup(render_guts_t* guts, rope_t &rope) const;
+  };
+
+  //
+  // NodeProgram
+  class NodeProgram: public Node {
+    public:
+      NodeProgram();
+      NodeProgram(const char* code);
+      NodeProgram(FILE* file);
+      virtual Node* clone(Node* node = NULL) const;
   };
 
   //
@@ -350,15 +359,21 @@ namespace fbjs {
   };
 
   //
-  // NodeFunction
-  class NodeFunction: public Node {
-    protected:
-      bool _declaration;
+  // NodeFunctionDeclaration
+  class NodeFunctionDeclaration: public Node {
     public:
-      NodeFunction(bool declaration = false, const unsigned int lineno = 0);
+      NodeFunctionDeclaration(const unsigned int lineno = 0);
       virtual Node* clone(Node* node = NULL) const;
       virtual rope_t render(render_guts_t* guts, int indentation) const;
-      bool declaration() const; // TODO: kill this
+  };
+
+  //
+  // NodeFunctionExpression
+  class NodeFunctionExpression: public NodeExpression {
+    public:
+      NodeFunctionExpression(const unsigned int lineno = 0);
+      virtual Node* clone(Node* node = NULL) const;
+      virtual rope_t render(render_guts_t* guts, int indentation) const;
   };
 
   //

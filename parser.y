@@ -7,7 +7,7 @@
   double number;
   char* string;
   fbjs::node_assignment_t assignment;
-  int integer;
+  size_t size;
   fbjs::Node* node;
   fbjs::Node* duple[2];
 }
@@ -55,9 +55,9 @@
 %token<string> t_IDENTIFIER t_REGEX t_STRING
 
 // Operators + associativity
-%left t_COMMA
-%right t_RSHIFT3_ASSIGN t_RSHIFT_ASSIGN t_LSHIFT_ASSIGN t_BIT_XOR_ASSIGN t_BIT_OR_ASSIGN t_BIT_AND_ASSIGN t_MOD_ASSIGN t_DIV_ASSIGN t_MULT_ASSIGN t_MINUS_ASSIGN t_PLUS_ASSIGN t_ASSIGN p_COMPOUND_ASSIGNMENT
-%right t_PLING t_COLON
+%token t_COMMA
+%right t_RSHIFT3_ASSIGN t_RSHIFT_ASSIGN t_LSHIFT_ASSIGN t_BIT_XOR_ASSIGN t_BIT_OR_ASSIGN t_BIT_AND_ASSIGN t_MOD_ASSIGN t_DIV_ASSIGN t_MULT_ASSIGN t_MINUS_ASSIGN t_PLUS_ASSIGN t_ASSIGN
+%token t_PLING t_COLON
 %left t_OR
 %left t_AND
 %left t_BIT_OR
@@ -68,9 +68,9 @@
 %left t_LSHIFT t_RSHIFT t_RSHIFT3
 %left t_PLUS t_MINUS
 %left t_DIV t_MULT t_MOD
-%left t_NOT t_BIT_NOT t_INCR t_DECR t_DELETE t_TYPEOF t_VOID
+%right t_NOT t_BIT_NOT t_INCR t_DECR t_DELETE t_TYPEOF t_VOID
 %nonassoc p_POSTFIX
-%left t_NEW t_PERIOD
+%token t_NEW t_PERIOD
 
 // Literals
 %type<node> null_literal boolean_literal numeric_literal regex_literal string_literal array_literal element_list object_literal property_name property_name_and_value_list
@@ -83,7 +83,7 @@
 // Shared expression primitives
 %type<node> identifier arguments argument_list
 %type<assignment> assignment_operator
-%type<integer> elison
+%type<size> elison
 
 // Statements
 %type<node> statement block statement_list source_element
@@ -181,7 +181,7 @@ string_literal:
 array_literal:
     t_LBRACKET elison t_RBRACKET {
       $$ = (new NodeArrayLiteral(yylineno));
-      for (int i = 0; i < $2 + 1; i++) {
+      for (size_t i = 0; i < $2 + 1; i++) {
         $$->appendChild(new NodeEmptyExpression(yylineno));
       }
     }
@@ -193,7 +193,7 @@ array_literal:
     }
 |   t_LBRACKET element_list elison t_RBRACKET {
        $$ = $2;
-       for (int i = 0; i < $3; i++) {
+       for (size_t i = 0; i < $3; i++) {
          $$->appendChild(new NodeEmptyExpression(yylineno));
        }
     }
@@ -202,7 +202,7 @@ array_literal:
 element_list:
     elison assignment_expression {
       $$ = (new NodeArrayLiteral(yylineno));
-      for (int i = 0; i < $1; i++) {
+      for (size_t i = 0; i < $1; i++) {
         $$->appendChild(new NodeEmptyExpression(yylineno));
       }
       $$->appendChild($2);
@@ -212,7 +212,7 @@ element_list:
     }
 |   element_list elison assignment_expression {
       $$ = $1;
-      for (int i = 1; i < $2; i++) {
+      for (size_t i = 1; i < $2; i++) {
         $$->appendChild(new NodeEmptyExpression(yylineno));
       }
       $$->appendChild($3);
@@ -1072,25 +1072,25 @@ finally:
 // Functions
 function_declaration:
     t_FUNCTION identifier t_LPAREN formal_parameter_list t_RPAREN t_LCURLY function_body t_RCURLY {
-      $$ = (new NodeFunction(true, $2->lineno()))->appendChild($2)->appendChild($4)->appendChild($7);
+      $$ = (new NodeFunctionDeclaration($2->lineno()))->appendChild($2)->appendChild($4)->appendChild($7);
     }
 |   t_FUNCTION identifier t_LPAREN t_RPAREN t_LCURLY function_body t_RCURLY {
-      $$ = (new NodeFunction(true, $2->lineno()))->appendChild($2)->appendChild(new NodeArgList(yylineno))->appendChild($6);
+      $$ = (new NodeFunctionDeclaration($2->lineno()))->appendChild($2)->appendChild(new NodeArgList(yylineno))->appendChild($6);
     }
 ;
 
 function_expression:
     t_FUNCTION identifier t_LPAREN formal_parameter_list t_RPAREN t_LCURLY function_body t_RCURLY {
-      $$ = (new NodeFunction(false, $2->lineno()))->appendChild($2)->appendChild($4)->appendChild($7);
+      $$ = (new NodeFunctionExpression($2->lineno()))->appendChild($2)->appendChild($4)->appendChild($7);
     }
 |   t_FUNCTION identifier t_LPAREN t_RPAREN t_LCURLY function_body t_RCURLY {
-      $$ = (new NodeFunction(false, $2->lineno()))->appendChild($2)->appendChild(new NodeArgList(yylineno))->appendChild($6);
+      $$ = (new NodeFunctionExpression($2->lineno()))->appendChild($2)->appendChild(new NodeArgList(yylineno))->appendChild($6);
     }
 |   t_FUNCTION t_LPAREN formal_parameter_list t_RPAREN t_LCURLY function_body t_RCURLY {
-      $$ = (new NodeFunction(false, $3->lineno()))->appendChild(NULL)->appendChild($3)->appendChild($6);
+      $$ = (new NodeFunctionExpression($3->lineno()))->appendChild(NULL)->appendChild($3)->appendChild($6);
     }
 |   t_FUNCTION t_LPAREN t_RPAREN t_LCURLY function_body t_RCURLY {
-      $$ = (new NodeFunction(false, $5->lineno()))->appendChild(NULL)->appendChild(new NodeArgList(yylineno))->appendChild($5);
+      $$ = (new NodeFunctionExpression($5->lineno()))->appendChild(NULL)->appendChild(new NodeArgList(yylineno))->appendChild($5);
     }
 ;
 
