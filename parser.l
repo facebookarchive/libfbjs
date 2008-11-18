@@ -165,10 +165,16 @@ FBJSBEGIN(IDENTIFIER);
   return parsertok(t_NUMBER);
 }
 0[0-7]+ {
-  // TODO: octal
+  unsigned int val;
+  sscanf(yytext, "%o", &val);
+  yylval->number = (double)val;
+  return parsertok(t_NUMBER);
 }
 [0-9]*\.?[0-9]+[eE]-?[0-9]{1,3}  {
-  // TODO: exponent notation
+  float val;
+  sscanf(yytext, "%e", &val);
+  yylval->number = (double)val;
+  return parsertok(t_NUMBER);
 }
 [0-9]+ {
   yylval->number = atof(yytext);
@@ -183,11 +189,6 @@ FBJSBEGIN(IDENTIFIER);
   return parsertok(t_IDENTIFIER);
 }
 '|\" {
-  // TODO: Figure out why the expression doesn't work :(
-/*
--'(\\.|\\[\n\r]|[^'])*'  |
--\"(\\.|\\[\n\r]|[^\"])*\" {
-*/
   std::string str = yytext;
   char c;
   while ((c = yyinput(yyscanner)) != EOF) {
@@ -199,18 +200,29 @@ FBJSBEGIN(IDENTIFIER);
       if (c == EOF) {
         NEVERMIND;
         break;
+      } else if (c == '\r') {
+        str.erase(--str.end());
+        c = yyinput(yyscanner);
+        if (c != '\n') {
+          str += c;
+          if (c == yytext[0]) {
+            break;
+          }
+        }
+      } else if (c == '\n') {
+        str.erase(--str.end());
+      } else if (c == EOF) {
+        NEVERMIND;
+        break;
+      } else {
+        str += c;
       }
-      str += c;
+    } else if (c == '\n' || c == '\r') {
+      NEVERMIND;
+      break;
     }
   }
   yylval->string = strdup(str.c_str());
-  return parsertok(t_STRING);
-
-  /* TODO: check for line continuation
-     var a = 'test \
-     wat ';
-  */
-  yylval->string = strdup(yytext);
   return parsertok(t_STRING);
 }
 <IDENTIFIER>"/" FBJSBEGIN(REGEX);
