@@ -33,12 +33,3 @@ void yyset_debug(int bdebug, void* yyscanner);
 void yyrestart(FILE* input_file, void* yyscanner);
 int yyparse(void* yyscanner, fbjs::Node* root);
 
-// Parser exception
-namespace fbjs {
-  class ParseException: public std::exception {
-    public:
-      char error[128];
-      ParseException(const std::string msg);
-      const char* what() const throw();
-  };
-}

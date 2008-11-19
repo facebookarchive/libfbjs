@@ -17,7 +17,7 @@ const char* ParseException::what() const throw() {
 
 //
 // Parse from a file
-NodeProgram::NodeProgram(FILE* file) {
+NodeProgram::NodeProgram(FILE* file) : Node(1) {
 
   // Initialize the scanner.
   void* scanner;
@@ -42,7 +42,7 @@ NodeProgram::NodeProgram(FILE* file) {
   yylex_destroy(scanner);
   if (!extra.errors.empty()) {
     list<string>::iterator i;
-    for (i = extra.errors.begin(); i != extra.errors.end(); i++) {
+    for (i = extra.errors.begin(); i != extra.errors.end(); ++i) {
       this->~Node();
       throw ParseException(*i);
     }
@@ -51,7 +51,7 @@ NodeProgram::NodeProgram(FILE* file) {
 
 //
 // Parser from a string
-NodeProgram::NodeProgram(const char* str) {
+NodeProgram::NodeProgram(const char* str) : Node(1) {
 
   // Initialize the scanner.
   void* scanner;
@@ -75,8 +75,7 @@ NodeProgram::NodeProgram(const char* str) {
   yylex_destroy(scanner);
   if (!extra.errors.empty()) {
     list<string>::iterator i;
-    for (i = extra.errors.begin(); i != extra.errors.end(); i++) {
-      this->~Node();
+    for (i = extra.errors.begin(); i != extra.errors.end(); ++i) {
       throw ParseException(*i);
     }
   }

@@ -14,9 +14,10 @@ int main(int argc, char* argv[]) {
   root = fbjsize(root, &guts);
 
   // Render
-  rope_t rendered = root->render(RENDER_PRETTY/* | RENDER_MAINTAIN_LINENO*/);
+  rope_t rendered = root->render(RENDER_PRETTY);
   delete root;
   std::cout<<rendered;
   printf("\n");
   return 0;
+
 }

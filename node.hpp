@@ -495,4 +495,13 @@ namespace fbjs {
       virtual Node* clone(Node* node = NULL) const;
       virtual rope_t render(render_guts_t* guts, int indentation) const;
   };
+
+  //
+  // Parser exception
+  class ParseException: public std::exception {
+    public:
+      char error[128];
+      ParseException(const std::string msg);
+      const char* what() const throw();
+  };
 }
