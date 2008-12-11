@@ -114,8 +114,9 @@ namespace fbjs {
   class NodeRegexLiteral: public NodeExpression {
     protected:
       std::string value;
+      std::string flags;
     public:
-      NodeRegexLiteral(std::string value, const unsigned int lineno = 0);
+      NodeRegexLiteral(std::string value, std::string flags, const unsigned int lineno = 0);
       virtual Node* clone(Node* node = NULL) const;
       virtual rope_t render(render_guts_t* guts, int indentation) const;
   };

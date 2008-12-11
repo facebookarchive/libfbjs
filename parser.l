@@ -230,9 +230,19 @@ FBJSBEGIN(IDENTIFIER);
 <IDENTIFIER>"/" FBJSBEGIN(REGEX);
 <REGEX>(\[([^\]\\]+|\\.)+\]|\\.|[^\/\\])*"/"[A-Za-z]* {
   size_t len = strlen(yytext);
-  yylval->string = (char*)malloc(len); // last char is a /, which will become a NULL, len is sufficient memory
-  memcpy(yylval->string, yytext, len - 1);
-  yylval->string[len - 1] = 0;
+  size_t flag_pos = len - 1;
+  while (yytext[flag_pos] != '/') {
+    --flag_pos;
+  }
+  // regex
+  yylval->string_duple[0] = (char*)malloc(flag_pos + 1);
+  memcpy(yylval->string_duple[0], yytext, flag_pos);
+  yylval->string_duple[0][flag_pos] = 0;
+
+  // flags
+  yylval->string_duple[1] = (char*)malloc(len - flag_pos);
+  memcpy(yylval->string_duple[1], yytext + flag_pos + 1, len - flag_pos);
+
   return parsertok(t_REGEX);
 }
 "{" {

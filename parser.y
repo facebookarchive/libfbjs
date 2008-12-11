@@ -6,6 +6,7 @@
 %union {
   double number;
   char* string;
+  char* string_duple[2];
   fbjs::node_assignment_t assignment;
   size_t size;
   fbjs::Node* node;
@@ -52,7 +53,8 @@
 
 // Tokens with a value
 %token<number> t_NUMBER
-%token<string> t_IDENTIFIER t_REGEX t_STRING
+%token<string> t_IDENTIFIER t_STRING
+%token<string_duple> t_REGEX
 
 // Operators + associativity
 %token t_COMMA
@@ -165,8 +167,9 @@ numeric_literal:
 
 regex_literal:
     t_REGEX {
-      $$ = new NodeRegexLiteral($1, yylineno);
-      free($1);
+      $$ = new NodeRegexLiteral($1[0], $1[1], yylineno);
+      free($1[0]);
+      free($1[1]);
     }
 ;
 

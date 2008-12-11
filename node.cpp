@@ -281,14 +281,14 @@ rope_t NodeStringLiteral::render(render_guts_t* guts, int indentation) const {
 
 //
 // NodeRegexLiteral: /foo|bar/
-NodeRegexLiteral::NodeRegexLiteral(string value, const unsigned int lineno /* = 0 */) : NodeExpression(lineno), value(value) {}
+NodeRegexLiteral::NodeRegexLiteral(string value, string flags, const unsigned int lineno /* = 0 */) : NodeExpression(lineno), value(value), flags(flags) {}
 
 Node* NodeRegexLiteral::clone(Node* node) const {
-  return new NodeRegexLiteral(this->value);
+  return new NodeRegexLiteral(this->value, this->flags);
 }
 
 rope_t NodeRegexLiteral::render(render_guts_t* guts, int indentation) const {
-  return rope_t("/") + this->value.c_str() + "/";
+  return rope_t("/") + this->value.c_str() + "/" + this->flags.c_str();
 }
 
 //

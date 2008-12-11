@@ -154,21 +154,14 @@ Node* fbjsize(Node* node, fbjsize_guts_t* guts) {
     // Turn `new foo(1, 2)' into: `fbjs.alloc(foo, [1, 2])'
     node_list_t::iterator func = node->childNodes().begin();
     Node* args = new NodeArrayLiteral();
-    Node* constructor = node->removeChild(func++);
+    Node* constructor = fbjsize(node->removeChild(func++), guts);
     node_list_t::iterator arg = (*func)->childNodes().begin();
     while (arg != (*func)->childNodes().end()) {
-      args->appendChild((*func)->removeChild(arg++));
+      args->appendChild(fbjsize((*func)->removeChild(arg++), guts));
     }
     delete node;
-    return (new NodeFunctionCall())
-      ->appendChild((new NodeStaticMemberExpression())
-        ->appendChild(new NodeIdentifier("FBJS"))
-        ->appendChild(new NodeIdentifier("alloc")))
-      ->appendChild(fbjsize((new NodeArgList())
-        ->appendChild(constructor)
-        ->appendChild(args),
-        guts));
 
+    return fbjs_runtime_node("alloc", 2, constructor, args);
   } else if (typeid(*node) == typeid(NodeWith)) {
 
     // Evaluate the with expression
@@ -241,12 +234,7 @@ Node* fbjsize(Node* node, fbjsize_guts_t* guts) {
     return node;
 
     // This one is always the same... FBJS.that(this)
-    return (new NodeFunctionCall())
-      ->appendChild((new NodeStaticMemberExpression())
-        ->appendChild(new NodeIdentifier("FBJS"))
-        ->appendChild(new NodeIdentifier("that")))
-      ->appendChild((new NodeArgList())
-        ->appendChild(node));
+    return fbjs_runtime_node("that", 1, node);
 
   } else if (typeid(*node) == typeid(NodeUnary)) {
 
@@ -263,13 +251,7 @@ Node* fbjsize(Node* node, fbjsize_guts_t* guts) {
         node_pair_t expr = fbjs_split_member_expression(node->childNodes().front(), guts);
         if (expr.first != NULL) {
           delete node;
-          return (new NodeFunctionCall())
-            ->appendChild((new NodeStaticMemberExpression())
-              ->appendChild(new NodeIdentifier("FBJS"))
-              ->appendChild(new NodeIdentifier("expunge")))
-            ->appendChild((new NodeArgList())
-              ->appendChild(expr.first)
-              ->appendChild(expr.second));
+          return fbjs_runtime_node("expunge", 2, expr.first, expr.second);
         }
       }
     } else if (op == INCR_UNARY || op == DECR_UNARY) {
@@ -319,14 +301,8 @@ Node* fbjsize(Node* node, fbjsize_guts_t* guts) {
 
     // property will be an Expression
     if (expr.first != NULL) {
-      Node* retargs;
-      Node* ret = (new NodeFunctionCall())
-        ->appendChild((new NodeStaticMemberExpression())
-          ->appendChild(new NodeIdentifier("FBJS"))
-          ->appendChild(new NodeIdentifier("invoke")))
-        ->appendChild(retargs = (new NodeArgList())
-          ->appendChild(expr.first)
-          ->appendChild(expr.second));
+      Node* ret = fbjs_runtime_node("invoke", 2, expr.first, expr.second);
+      Node* retargs = ret->childNodes().back();
       Node* args = node->childNodes().back();
 
       // The 3rd parameter to FBJS.invoke is an array of the original arguments, or nothing if there weren't any arguments.
@@ -431,12 +407,7 @@ Node* fbjsize(Node* node, fbjsize_guts_t* guts) {
       ->appendChild((new NodeVarDeclaration())
         ->appendChild((new NodeAssignment(ASSIGN))
           ->appendChild(keys)
-          ->appendChild((new NodeFunctionCall())
-            ->appendChild((new NodeStaticMemberExpression())
-              ->appendChild(new NodeIdentifier("FBJS"))
-              ->appendChild(new NodeIdentifier("keys")))
-            ->appendChild((new NodeArgList())
-              ->appendChild(fbjsize(node->removeChild(++loop), guts))))))
+          ->appendChild(fbjs_runtime_node("keys", 1, fbjsize(node->removeChild(++loop), guts)))))
       ->appendChild(node);
     loop = node->childNodes().begin(); ++loop;
     node->insertBefore(keys->clone(), loop++);
@@ -507,11 +478,11 @@ Node* NodeFBJSShield::clone(Node* node) const {
 }
 
 Node* fbjs_runtime_node(const char* fn, const unsigned int num, ...) {
+  string name("FBJS$");
+  name += fn;
   Node* args_node;
   Node* ret = (new NodeFunctionCall())
-    ->appendChild((new NodeStaticMemberExpression())
-      ->appendChild(new NodeIdentifier("FBJS"))
-      ->appendChild(new NodeIdentifier(fn)))
+    ->appendChild(new NodeIdentifier(name))
     ->appendChild(args_node = new NodeArgList());
 
   va_list args;
