@@ -43,6 +43,22 @@ Node* fbjsize(Node* node, fbjsize_guts_t* guts) {
       statements = node->childNodes().front();
     }
 
+    // Create a placeholder for variable assignments
+    Node* vars;
+    if (program) {
+      vars = new NodeStatementList();
+    } else {
+      vars = new NodeVarDeclaration();
+      if (fbjs_scope_uses_arguments(statements)) {
+        implied.insert("arguments");
+        scope.insert("arguments");
+        vars->appendChild((new NodeAssignment(ASSIGN))
+          ->appendChild(new NodeIdentifier("_$arguments"))
+          ->appendChild(fbjs_runtime_node("args", 1, new NodeIdentifier("arguments")))
+        );
+      }
+    }
+
     // Analyze local variables
     if (!program) {
       fbjs_analyze_scope(statements, &scope);
@@ -50,12 +66,6 @@ Node* fbjsize(Node* node, fbjsize_guts_t* guts) {
     }
 
     // Remove FunctionDeclaration (fbjs_declare_functions runs fbjsize on those)
-    Node* vars;
-    if (program) {
-      vars = new NodeStatementList();
-    } else {
-      vars = new NodeVarDeclaration();
-    }
     fbjs_declare_functions(statements, vars, &implied, guts);
     if (!program) {
       // Put each local variable that's also not a declaration into the var declaration
@@ -666,6 +676,25 @@ bool fbjs_check_scope(const string identifier, scope_stack_t* scope) {
   for (scope_stack_t::const_iterator i = scope->begin(); i != scope->end(); ++i) {
     if ((*i)->count(identifier)) {
       return true;
+    }
+  }
+  return false;
+}
+
+bool fbjs_scope_uses_arguments(Node* node) {
+  for (node_list_t::iterator ii = node->childNodes().begin(); ii != node->childNodes().end(); ++ii) {
+    if (*ii == NULL) {
+      continue;
+    }
+    NodeIdentifier* identifier = dynamic_cast<NodeIdentifier*>(*ii);
+    if (identifier != NULL) {
+      if (identifier->name() == "arguments") {
+        return true;
+      }
+    } else if (typeid(**ii) != typeid(NodeFunctionDeclaration) && typeid(**ii) != typeid(NodeFunctionExpression)) {
+      if (fbjs_scope_uses_arguments(*ii)) {
+        return true;
+      }
     }
   }
   return false;

@@ -32,3 +32,4 @@ node_operator_t fbjs_assignment_op_to_expr_op(node_assignment_t op);
 void fbjs_analyze_scope(Node* node, scope_t* scope);
 bool fbjs_declare_functions(Node* node, Node* decl, scope_t* scope, fbjsize_guts_t* guts);
 bool fbjs_check_scope(const string identifier, scope_stack_t* scope);
+bool fbjs_scope_uses_arguments(Node* node);
