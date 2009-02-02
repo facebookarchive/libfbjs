@@ -45,9 +45,12 @@ FBJSBEGIN(IDENTIFIER);
     NEVERMIND;
   }
 }
+<IDENTIFIER,DOT,VIRTUAL_SEMICOLON,NO_LINEBREAK>{
+  /* start conditon is all, minus REGEX */
+  "<!--".*  /* om nom nom */
+}
 <*>{
   "//".*    |
-  "<!--".*  |
   [ \t\x0b\x0c\xa0\r]+ /* om nom nom */
   "/*" {
     char c;
