@@ -326,7 +326,7 @@ FBJSBEGIN(IDENTIFIER);
   if (yyextra->last_tok == t_IDENTIFIER || yyextra->last_tok == t_NUMBER || yyextra->last_tok == t_STRING ||
     yyextra->last_tok == t_REGEX || yyextra->last_tok == t_TRUE || yyextra->last_tok == t_FALSE ||
     yyextra->last_tok == t_RPAREN || yyextra->last_tok == t_RCURLY || yyextra->last_tok == t_RBRACKET ||
-    yyextra->last_tok == t_NULL) {
+    yyextra->last_tok == t_NULL || yyextra->last_tok == t_THIS) {
     yyextra->virtual_semicolon_last_state = YY_START;
     FBJSBEGIN(VIRTUAL_SEMICOLON);
     // Not to spec... sec 7.9.1

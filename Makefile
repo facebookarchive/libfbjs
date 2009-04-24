@@ -18,5 +18,11 @@ fbjs: parser.lex.cpp parser.yacc.cpp parser.cpp node.cpp fbjs.cpp cli.cpp
 troy: parser.lex.cpp parser.yacc.cpp parser.cpp node.cpp troy.cpp
 	g++ -ggdb -Wall $^ -o $@
 
+jsbeautify: parser.lex.cpp parser.yacc.cpp parser.cpp node.cpp jsbeautify.cpp
+	g++ -ggdb -Wall $^ -o $@
+
+jsexports: parser.lex.cpp parser.yacc.cpp parser.cpp node.cpp jsexports.cpp
+	g++ -ggdb -Wall $^ -o $@
+
 clean:
 	rm -f fbjs troy parser.yacc.cpp parser.lex.cpp libfbjs.so
