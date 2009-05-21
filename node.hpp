@@ -261,6 +261,7 @@ namespace fbjs {
       virtual rope_t render(render_guts_t* guts, int indentation) const;
       virtual std::string name() const;
       virtual Node* identifier();
+      virtual void rename(const std::string &str);
   };
 
   //

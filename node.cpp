@@ -662,6 +662,10 @@ Node* NodeIdentifier::identifier() {
   return this;
 }
 
+void NodeIdentifier::rename(const std::string &str) {
+  this->_name = str;
+}
+
 //
 // NodeArgList: list of expressions for a function call or definition
 NodeArgList::NodeArgList(const unsigned int lineno /* = 0 */) : Node(lineno) {}
@@ -749,16 +753,21 @@ rope_t NodeIf::render(render_guts_t* guts, int indentation) const {
   ret += ")";
   ret += (*++node)->renderBlock(false, guts, indentation);
   if (*++node != NULL) {
-    ret += guts->pretty ? " else " : "else";
+    ret += guts->pretty ? " else" : "else";
 
     // Special-case for rendering else if's
     if (typeid(**node) == typeid(NodeIf)) {
       if (guts->sanelineno) {
         (*node)->renderLinenoCatchup(guts, ret);
       }
+      ret += " ";
       ret += (*node)->render(guts, indentation);
     } else {
-      ret += (*node)->renderBlock(false, guts, indentation);
+      rope_t block = (*node)->renderBlock(false, guts, indentation);
+      if (block[0] != '{') {
+        ret += " ";
+      }
+      ret += block;
     }
   }
   return ret;
