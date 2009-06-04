@@ -181,10 +181,7 @@ FBJSBEGIN(IDENTIFIER);
   yylval->number = (double)val;
   return parsertok(t_NUMBER);
 }
-[0-9]+ {
-  yylval->number = atof(yytext);
-  return parsertok(t_NUMBER);
-}
+[0-9]+\.? |
 [0-9]*\.[0-9]+ {
   yylval->number = atof(yytext);
   return parsertok(t_NUMBER);
@@ -382,6 +379,7 @@ int parsertok_(void* guts, int tok) {
   return tok;
 }
 
+// TODO: YY_BUFFER_STATE yy_scan_string ( const char *str )
 inline void FBJS_INPUT(char* buf, int &result, int max_size, bool is_interactive, struct yyguts_t* yyg) {
 #define yyscanner yyg
   if (yyextra->strstream == NULL) {
