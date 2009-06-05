@@ -1,4 +1,5 @@
 #include "node.hpp"
+extern "C" char* g_fmt(char*, double);
 using namespace std;
 using namespace fbjs;
 
@@ -241,25 +242,8 @@ Node* NodeNumericLiteral::clone(Node* node) const {
 }
 
 rope_t NodeNumericLiteral::render(render_guts_t* guts, int indentation) const {
-
-  // Try to print out a concise number
-  char buf[64];
-  int trunc = -1, point = -1;
-  sprintf(buf, "%.19f", this->value);
-  for (int i = 0; buf[i] != 0; i++) {
-    if (point == -1) {
-      if (buf[i] == '.') {
-        trunc = point = i;
-      }
-    } else if (point + i > 18) {
-      break;
-    } else if (buf[i] != '0') {
-      trunc = i + 1;
-    }
-  }
-  if (trunc != -1) {
-    buf[trunc] = 0;
-  }
+  char buf[32];
+  g_fmt(buf, this->value);
   return rope_t(buf);
 }
 

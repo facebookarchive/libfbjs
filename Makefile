@@ -1,3 +1,5 @@
+CPPFLAGS=-fPIC -Wall -ggdb
+
 all: libfbjs.so
 
 install:
@@ -9,20 +11,40 @@ parser.lex.cpp: parser.l
 parser.yacc.cpp: parser.y
 	bison --debug --verbose -d -o $@ $<
 
-libfbjs.so: parser.lex.cpp parser.yacc.cpp parser.cpp node.cpp fbjs.cpp
-	g++ -ggdb -fPIC -shared -Wall $^ -o $@
+dmg_fp_dtoa.c:
+	curl 'http://www.netlib.org/fp/dtoa.c' -o $@
 
-fbjs: parser.lex.cpp parser.yacc.cpp parser.cpp node.cpp fbjs.cpp cli.cpp
-	g++ -ggdb -Wall $^ -o $@
+dmg_fp_g_fmt.c:
+	curl 'http://www.netlib.org/fp/g_fmt.c' -o $@
 
-troy: parser.lex.cpp parser.yacc.cpp parser.cpp node.cpp troy.cpp
-	g++ -ggdb -Wall $^ -o $@
+dmg_fp_dtoa.o: dmg_fp_dtoa.c
+	$(CC) -fPIC -c $< -o $@ -DIEEE_8087=1 -DNO_HEX_FP=1 -DLong=int32_t -DULong=uint32_t -include stdint.h
 
-jsbeautify: parser.lex.cpp parser.yacc.cpp parser.cpp node.cpp jsbeautify.cpp
-	g++ -ggdb -Wall $^ -o $@
+dmg_fp_g_fmt.o: dmg_fp_g_fmt.c
+	$(CC) -fPIC -c $< -o $@ -DIEEE_8087=1 -DNO_HEX_FP=1 -DLong=int32_t -DULong=uint32_t -include stdint.h
 
-jsexports: parser.lex.cpp parser.yacc.cpp parser.cpp node.cpp jsexports.cpp
-	g++ -ggdb -Wall $^ -o $@
+libfbjs.a: parser.yacc.o parser.lex.o parser.o node.o dmg_fp_dtoa.o dmg_fp_g_fmt.o
+	$(AR) rc $@ $^
+	$(AR) -s $@
+
+libfbjs.so: libfbjs.a fbjs.o
+	$(CC) -fPIC -shared $^ -o $@
+
+fbjs: cli.cpp libfbjs.a
+	$(CXX) -ggdb -Wall $^ -o $@
+
+troy: troy.cpp libfbjs.a
+	$(CXX) -ggdb -Wall $^ -o $@
+
+jsbeautify: jsbeautify.cpp libfbjs.a
+	$(CXX) -ggdb -Wall $^ -o $@
+
+jsexports: jsexports.cpp libfbjs.a
+	$(CXX) -ggdb -Wall $^ -o $@
 
 clean:
-	rm -f fbjs troy parser.yacc.cpp parser.lex.cpp libfbjs.so
+	$(RM) -f fbjs troy jsbeautify jsexports \
+    parser.lex.cpp parser.yacc.cpp parser.yacc.hpp parser.yacc.output \
+    libfbjs.so libfbjs.a \
+    dmg_fp_dtoa.o dmg_fp_g_fmt.o \
+    parser.lex.o parser.yacc.o parser.o node.o fbjs.o
