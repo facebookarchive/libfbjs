@@ -1,3 +1,5 @@
+//
+// ATTN: If you're just using FBJS for parsing, include node.hpp! fbjs.hpp is for Facebook Platform.
 #pragma once
 #include <vector>
 #include <set>

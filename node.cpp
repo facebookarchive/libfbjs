@@ -51,8 +51,8 @@ Node* Node::insertBefore(Node* node, node_list_t::iterator node_pos) {
   return node;
 }
 
-node_list_t& Node::childNodes() {
-  return this->_childNodes;
+node_list_t& Node::childNodes() const {
+  return const_cast<Node*>(this)->_childNodes;
 }
 
 bool Node::empty() const {
@@ -162,6 +162,45 @@ unsigned int  Node::lineno() const {
   return this->_lineno;
 }
 
+Node* Node::reduce() {
+  Node* tmp;
+  node_list_t::iterator ii = this->_childNodes.begin();
+  while (ii != this->_childNodes.end()) {
+    if (*ii == NULL) {
+      ++ii;
+      continue;
+    }
+    tmp = (*ii)->reduce();
+    if (tmp == NULL) {
+      this->removeChild(ii++);
+    } else if (tmp != *ii) {
+      this->replaceChild(tmp, ii++);
+    } else {
+      ++ii;
+    }
+  }
+  return this;
+}
+
+bool Node::operator== (const Node &that) const {
+  if (typeid(*this) != typeid(that)) {
+    return false;
+  }
+  node_list_t::iterator jj = that.childNodes().begin();
+  for (node_list_t::iterator ii = this->childNodes().begin(); ii != this->childNodes().end(); ++ii) {
+    if (!(**jj == **ii)) {
+      return false;
+    }
+    if (++jj == that.childNodes().end()) {
+      if (++ii != this->childNodes().end()) {
+        return false;
+      }
+      break;
+    }
+  }
+  return true;
+}
+
 //
 // NodeProgram: a javascript program
 NodeProgram::NodeProgram() : Node(1) {}
@@ -226,11 +265,42 @@ rope_t NodeStatementList::renderStatement(render_guts_t* guts, int indentation) 
   return this->render(guts, indentation);
 }
 
+Node* NodeStatementList::reduce() {
+  Node* tmp;
+  node_list_t::iterator ii = this->_childNodes.begin();
+  while (ii != this->_childNodes.end()) {
+    if (*ii == NULL) {
+      // This shouldn't happen...
+      this->removeChild(ii++);
+      continue;
+    }
+    tmp = (*ii)->reduce();
+    NodeExpression* expr = tmp == NULL ? NULL : dynamic_cast<NodeExpression*>(tmp);
+    if (expr != NULL) {
+      if (expr->compare(true) || expr->compare(false)) { // constant expression -- no side-effects
+        tmp = NULL;
+      }
+    }
+    if (tmp == NULL) {
+      this->removeChild(ii++);
+    } else if (tmp != *ii) {
+      this->replaceChild(tmp, ii++);
+    } else {
+      ++ii;
+    }
+  }
+  return this;
+}
+
 //
 // NodeExpression
 NodeExpression::NodeExpression(const unsigned int lineno /* = 0 */) : Node(lineno) {}
 rope_t NodeExpression::renderStatement(render_guts_t* guts, int indentation) const {
   return this->render(guts, indentation) + ";";
+}
+
+bool NodeExpression::compare(bool val) const {
+  return false;
 }
 
 //
@@ -245,6 +315,11 @@ rope_t NodeNumericLiteral::render(render_guts_t* guts, int indentation) const {
   char buf[32];
   g_fmt(buf, this->value);
   return rope_t(buf);
+}
+
+bool NodeNumericLiteral::operator== (const Node &that) const {
+  const NodeNumericLiteral* thatLiteral = dynamic_cast<const NodeNumericLiteral*>(&that);
+  return thatLiteral == NULL ? false : this->value == thatLiteral->value;
 }
 
 //
@@ -263,6 +338,11 @@ rope_t NodeStringLiteral::render(render_guts_t* guts, int indentation) const {
   }
 }
 
+bool NodeStringLiteral::operator== (const Node &that) const {
+  const NodeStringLiteral* thatLiteral = dynamic_cast<const NodeStringLiteral*>(&that);
+  return thatLiteral == NULL ? false : this->value == thatLiteral->value;
+}
+
 //
 // NodeRegexLiteral: /foo|bar/
 NodeRegexLiteral::NodeRegexLiteral(string value, string flags, const unsigned int lineno /* = 0 */) : NodeExpression(lineno), value(value), flags(flags) {}
@@ -275,6 +355,11 @@ rope_t NodeRegexLiteral::render(render_guts_t* guts, int indentation) const {
   return rope_t("/") + this->value.c_str() + "/" + this->flags.c_str();
 }
 
+bool NodeRegexLiteral::operator== (const Node &that) const {
+  const NodeRegexLiteral* thatLiteral = dynamic_cast<const NodeRegexLiteral*>(&that);
+  return thatLiteral == NULL ? false : this->value == thatLiteral->value && this->flags == thatLiteral->flags;
+}
+
 //
 // NodeBooleanLiteral: true or false
 NodeBooleanLiteral::NodeBooleanLiteral(bool value, const unsigned int lineno /* = 0 */) : NodeExpression(lineno), value(value) {}
@@ -285,6 +370,15 @@ rope_t NodeBooleanLiteral::render(render_guts_t* guts, int indentation) const {
 
 Node* NodeBooleanLiteral::clone(Node* node) const {
   return new NodeBooleanLiteral(this->value);
+}
+
+bool NodeBooleanLiteral::compare(bool val) const {
+  return val == this->value;
+}
+
+bool NodeBooleanLiteral::operator== (const Node &that) const {
+  const NodeBooleanLiteral* thatLiteral = dynamic_cast<const NodeBooleanLiteral*>(&that);
+  return thatLiteral == NULL ? false : this->value == thatLiteral->value;
 }
 
 //
@@ -444,6 +538,51 @@ rope_t NodeOperator::render(render_guts_t* guts, int indentation) const {
   return ret;
 }
 
+Node* NodeOperator::reduce() {
+  Node::reduce();
+  NodeExpression* left = dynamic_cast<NodeExpression*>(this->_childNodes.front());
+  NodeExpression* right = dynamic_cast<NodeExpression*>(this->_childNodes.back());
+  switch (this->op) {
+    case OR:
+      if (left->compare(true)) {
+        Node* tmp = this->removeChild(this->_childNodes.begin());
+        delete this;
+        return tmp;
+      } else if (left->compare(false)) {
+        if (right->compare(true)) {
+          Node* tmp = this->removeChild(++this->_childNodes.begin());
+          delete this;
+          return tmp;
+        } else if (right->compare(false)) {
+          delete this;
+          return new NodeBooleanLiteral(false);
+        }
+      }
+      break;
+    case AND:
+      if (left->compare(false)) {
+        delete this;
+        return new NodeBooleanLiteral(false);
+      } else if (left->compare(true)) {
+        if (right->compare(false)) {
+          delete this;
+          return new NodeBooleanLiteral(false);
+        } else {
+          Node* tmp = this->removeChild(++this->_childNodes.begin());
+          delete this;
+          return tmp;
+        }
+      }
+      break;
+    default: break;
+  }
+  return this;
+}
+
+bool NodeOperator::operator== (const Node &that) const {
+  return Node::operator==(that) && this->op == static_cast<const NodeOperator*>(&that)->op;
+}
+
 //
 // NodeConditionalExpression: true ? yes() : no()
 NodeConditionalExpression::NodeConditionalExpression(const unsigned int lineno /* = 0 */) : NodeExpression(lineno) {}
@@ -461,6 +600,26 @@ rope_t NodeConditionalExpression::render(render_guts_t* guts, int indentation) c
   return ret;
 }
 
+Node* NodeConditionalExpression::reduce() {
+  Node::reduce();
+  NodeExpression* expression = (NodeExpression*)this->_childNodes.front();
+  bool evaluation = expression->compare(true);
+  if (!evaluation) {
+    evaluation = expression->compare(false);
+    if (!evaluation) {
+      return this;
+    }
+    evaluation = false;
+  }
+  node_list_t::iterator block = ++this->_childNodes.begin();
+  if (!evaluation) {
+    ++block;
+  }
+  Node* tmp = this->removeChild(block);
+  delete this;
+  return tmp;
+}
+
 //
 // NodeParenthetical: an expression in ()'s. this is actually implicit in the AST, but we also make it an explicit
 // node. Otherwise, the renderer would have to be aware of operator precedence which would be cumbersome.
@@ -475,6 +634,10 @@ rope_t NodeParenthetical::render(render_guts_t* guts, int indentation) const {
 
 Node* NodeParenthetical::identifier() {
   return this->_childNodes.front()->identifier();
+}
+
+bool NodeParenthetical::compare(bool val) const {
+  return static_cast<NodeExpression*>(this->_childNodes.front())->compare(val);
 }
 
 //
@@ -551,6 +714,10 @@ const node_assignment_t NodeAssignment::operatorType() const {
   return this->op;
 }
 
+bool NodeAssignment::operator== (const Node &that) const {
+  return Node::operator==(that) && this->op == static_cast<const NodeAssignment*>(&that)->op;
+}
+
 //
 // NodeUnary
 NodeUnary::NodeUnary(node_unary_t op, const unsigned int lineno /* = 0 */) : NodeExpression(lineno), op(op) {}
@@ -605,6 +772,10 @@ const node_unary_t NodeUnary::operatorType() const {
   return this->op;
 }
 
+bool NodeUnary::operator== (const Node &that) const {
+  return Node::operator==(that) && this->op == static_cast<const NodeUnary*>(&that)->op;
+}
+
 //
 // NodePostfix
 NodePostfix::NodePostfix(node_postfix_t op, const unsigned int lineno /* = 0 */) : NodeExpression(lineno), op(op) {}
@@ -624,6 +795,10 @@ rope_t NodePostfix::render(render_guts_t* guts, int indentation) const {
       break;
   }
   return ret;
+}
+
+bool NodePostfix::operator== (const Node &that) const {
+  return Node::operator==(that) && this->op == static_cast<const NodePostfix*>(&that)->op;
 }
 
 //
@@ -648,6 +823,11 @@ Node* NodeIdentifier::identifier() {
 
 void NodeIdentifier::rename(const std::string &str) {
   this->_name = str;
+}
+
+bool NodeIdentifier::operator== (const Node &that) const {
+  const NodeIdentifier* thatIdentifier = dynamic_cast<const NodeIdentifier*>(&that);
+  return thatIdentifier == NULL ? false : this->_name == thatIdentifier->_name;
 }
 
 //
@@ -711,6 +891,16 @@ rope_t NodeFunctionCall::render(render_guts_t* guts, int indentation) const {
   return rope_t(this->_childNodes.front()->render(guts, indentation)) + this->_childNodes.back()->render(guts, indentation);
 }
 
+Node* NodeFunctionCall::reduce() {
+  Node::reduce();
+  NodeIdentifier* iden = dynamic_cast<NodeIdentifier*>(this->_childNodes.front());
+  if (iden != NULL && iden->name() == "bagofholding") {
+    delete this;
+    return new NodeBooleanLiteral(false);
+  }
+  return this;
+}
+
 //
 // NodeFunctionConstructor: new foo(1)
 NodeFunctionConstructor::NodeFunctionConstructor(const unsigned int lineno /* = 0 */) : NodeExpression(lineno) {}
@@ -755,6 +945,31 @@ rope_t NodeIf::render(render_guts_t* guts, int indentation) const {
     }
   }
   return ret;
+}
+
+Node* NodeIf::reduce() {
+  Node::reduce();
+  NodeExpression* expression = (NodeExpression*)this->_childNodes.front();
+  bool evaluation = expression->compare(true);
+  if (!evaluation) {
+    evaluation = expression->compare(false);
+    if (!evaluation) {
+      return this;
+    }
+    evaluation = false;
+  }
+  node_list_t::iterator block = ++this->_childNodes.begin();
+  if (!evaluation) {
+    ++block;
+  }
+  if (*block == NULL) {
+    delete this;
+    return NULL;
+  } else {
+    Node* tmp = this->removeChild(block);
+    delete this;
+    return tmp;
+  }
 }
 
 //
@@ -840,6 +1055,10 @@ rope_t NodeStatementWithExpression::render(render_guts_t* guts, int indentation)
     ret += this->_childNodes.front()->render(guts, indentation);
   }
   return ret;
+}
+
+bool NodeStatementWithExpression::operator== (const Node &that) const {
+  return Node::operator==(that) && this->statement == static_cast<const NodeStatementWithExpression*>(&that)->statement;
 }
 
 //
