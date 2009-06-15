@@ -40,6 +40,7 @@ namespace fbjs {
       unsigned int lineno() const;
       virtual Node* reduce();
       virtual bool operator== (const Node&) const;
+      virtual bool operator!= (const Node&) const;
 
       node_list_t& Node::childNodes() const;
       Node* appendChild(Node* node);
@@ -99,6 +100,7 @@ namespace fbjs {
       NodeNumericLiteral(double value, const unsigned int lineno = 0);
       virtual Node* clone(Node* node = NULL) const;
       virtual rope_t render(render_guts_t* guts, int indentation) const;
+      virtual bool compare(bool val) const;
       virtual bool operator== (const Node&) const;
   };
 

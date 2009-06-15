@@ -31,11 +31,11 @@ const NodeExpression* findExpression(const Node* node) {
   if (dynamic_cast<const NodeExpression*>(node) != NULL) {
     return static_cast<const NodeExpression*>(node);
   }
-  const Node* tmp;
+  const NodeExpression* tmp;
   for (node_list_t::iterator ii = node->childNodes().begin(); ii != node->childNodes().end(); ++ii) {
     tmp = findExpression(*ii);
     if (tmp != NULL) {
-      return static_cast<const NodeExpression*>(tmp);
+      return tmp;
     }
   }
   return NULL;

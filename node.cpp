@@ -172,12 +172,11 @@ Node* Node::reduce() {
     }
     tmp = (*ii)->reduce();
     if (tmp == NULL) {
-      this->removeChild(ii++);
+      this->removeChild(ii);
     } else if (tmp != *ii) {
-      this->replaceChild(tmp, ii++);
-    } else {
-      ++ii;
+      this->replaceChild(tmp, ii);
     }
+    ++ii;
   }
   return this;
 }
@@ -188,7 +187,7 @@ bool Node::operator== (const Node &that) const {
   }
   node_list_t::iterator jj = that.childNodes().begin();
   for (node_list_t::iterator ii = this->childNodes().begin(); ii != this->childNodes().end(); ++ii) {
-    if (!(**jj == **ii)) {
+    if (**jj != **ii) {
       return false;
     }
     if (++jj == that.childNodes().end()) {
@@ -199,6 +198,10 @@ bool Node::operator== (const Node &that) const {
     }
   }
   return true;
+}
+
+bool Node::operator!= (const Node &that) const {
+  return !(*this == that);
 }
 
 //
@@ -317,6 +320,10 @@ rope_t NodeNumericLiteral::render(render_guts_t* guts, int indentation) const {
   return rope_t(buf);
 }
 
+bool NodeNumericLiteral::compare(bool val) const {
+  return val ? this->value != 0 : this->value == 0;
+}
+
 bool NodeNumericLiteral::operator== (const Node &that) const {
   const NodeNumericLiteral* thatLiteral = dynamic_cast<const NodeNumericLiteral*>(&that);
   return thatLiteral == NULL ? false : this->value == thatLiteral->value;
@@ -432,7 +439,9 @@ rope_t NodeOperator::render(render_guts_t* guts, int indentation) const {
   ret += this->_childNodes.front()->render(guts, indentation);
   if (guts->pretty) {
     padding = false;
+    if (this->op != COMMA) {
     ret += " ";
+  }
   }
   switch (this->op) {
     case COMMA:
@@ -572,6 +581,13 @@ Node* NodeOperator::reduce() {
           delete this;
           return tmp;
         }
+      }
+      break;
+    case COMMA:
+      if (left->compare(false) || left->compare(true)) {
+        Node* tmp = this->removeChild(++this->_childNodes.begin());
+        delete this;
+        return tmp;
       }
       break;
     default: break;
