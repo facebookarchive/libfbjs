@@ -35,7 +35,6 @@ namespace fbjs {
       virtual ~Node();
       virtual Node* clone(Node* node = NULL) const;
 
-      virtual Node* identifier(); // TODO: kill this
       bool empty() const;
       unsigned int lineno() const;
       virtual Node* reduce();
@@ -86,6 +85,7 @@ namespace fbjs {
   class NodeExpression: public Node {
     public:
       NodeExpression(const unsigned int lineno = 0);
+      virtual bool isValidlVal() const;
       virtual rope_t render(render_guts_t* guts, int indentation) const = 0;
       virtual rope_t renderStatement(render_guts_t* guts, int indentation) const;
       virtual bool compare(bool val) const;
@@ -211,7 +211,7 @@ namespace fbjs {
       NodeParenthetical(const unsigned int lineno = 0);
       virtual Node* clone(Node* node = NULL) const;
       virtual rope_t render(render_guts_t* guts, int indentation) const;
-      virtual Node* identifier();
+      virtual bool isValidlVal() const;
       virtual bool compare(bool val) const;
   };
 
@@ -278,7 +278,7 @@ namespace fbjs {
       virtual Node* clone(Node* node = NULL) const;
       virtual rope_t render(render_guts_t* guts, int indentation) const;
       virtual std::string name() const;
-      virtual Node* identifier();
+      virtual bool isValidlVal() const;
       virtual void rename(const std::string &str);
       virtual bool operator== (const Node&) const;
   };
@@ -323,25 +323,21 @@ namespace fbjs {
   //
   // NodeStaticMemberExpression
   class NodeStaticMemberExpression: public NodeExpression {
-    protected:
-      bool isAssignment;
     public:
       NodeStaticMemberExpression(const unsigned int lineno = 0);
       virtual Node* clone(Node* node = NULL) const;
       virtual rope_t render(render_guts_t* guts, int indentation) const;
-      Node* identifier();
+      virtual bool isValidlVal() const;
   };
 
   //
   // NodeDynamicMemberExpression
   class NodeDynamicMemberExpression: public NodeExpression {
-    protected:
-      bool isAssignment;
     public:
       NodeDynamicMemberExpression(const unsigned int lineno = 0);
       virtual Node* clone(Node* node = NULL) const;
       virtual rope_t render(render_guts_t* guts, int indentation) const;
-      Node* identifier();
+      virtual bool isValidlVal() const;
   };
 
   //

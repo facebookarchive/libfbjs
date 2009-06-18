@@ -32,4 +32,6 @@ void yyset_extra(YY_EXTRA_TYPE arbitrary_data, void* scanner);
 void yyset_debug(int bdebug, void* yyscanner);
 void yyrestart(FILE* input_file, void* yyscanner);
 int yyparse(void* yyscanner, fbjs::Node* root);
-
+#ifndef FLEX_SCANNER
+void* yy_scan_string(const char *yy_str, void* yyscanner);
+#endif

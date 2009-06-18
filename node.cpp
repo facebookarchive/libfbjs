@@ -154,10 +154,6 @@ bool Node::renderLinenoCatchup(render_guts_t* guts, rope_t &rope) const {
   return true;
 }
 
-Node* Node::identifier() {
-  return NULL;
-}
-
 unsigned int  Node::lineno() const {
   return this->_lineno;
 }
@@ -298,6 +294,11 @@ Node* NodeStatementList::reduce() {
 //
 // NodeExpression
 NodeExpression::NodeExpression(const unsigned int lineno /* = 0 */) : Node(lineno) {}
+
+bool NodeExpression::isValidlVal() const {
+  return false;
+}
+
 rope_t NodeExpression::renderStatement(render_guts_t* guts, int indentation) const {
   return this->render(guts, indentation) + ";";
 }
@@ -648,8 +649,8 @@ rope_t NodeParenthetical::render(render_guts_t* guts, int indentation) const {
   return rope_t("(") + this->_childNodes.front()->render(guts, indentation) + ")";
 }
 
-Node* NodeParenthetical::identifier() {
-  return this->_childNodes.front()->identifier();
+bool NodeParenthetical::isValidlVal() const {
+  return static_cast<NodeExpression*>(this->_childNodes.front())->isValidlVal();
 }
 
 bool NodeParenthetical::compare(bool val) const {
@@ -666,7 +667,7 @@ Node* NodeAssignment::clone(Node* node) const {
 
 rope_t NodeAssignment::render(render_guts_t* guts, int indentation) const {
   rope_t ret;
-  ret += this->_childNodes.front()->identifier()->render(guts, indentation);
+  ret += this->_childNodes.front()->render(guts, indentation);
   if (guts->pretty) {
     ret += " ";
   }
@@ -833,8 +834,8 @@ string NodeIdentifier::name() const {
   return this->_name;
 }
 
-Node* NodeIdentifier::identifier() {
-  return this;
+bool NodeIdentifier::isValidlVal() const {
+  return true;
 }
 
 void NodeIdentifier::rename(const std::string &str) {
@@ -1191,7 +1192,7 @@ rope_t NodeArrayLiteral::render(render_guts_t* guts, int indentation) const {
 
 //
 // NodeStaticMemberExpression: object access via foo.bar
-NodeStaticMemberExpression::NodeStaticMemberExpression(const unsigned int lineno /* = 0 */) : NodeExpression(lineno), isAssignment(false) {}
+NodeStaticMemberExpression::NodeStaticMemberExpression(const unsigned int lineno /* = 0 */) : NodeExpression(lineno) {}
 rope_t NodeStaticMemberExpression::render(render_guts_t* guts, int indentation) const {
   return rope_t(this->_childNodes.front()->render(guts, indentation)) + "." + this->_childNodes.back()->render(guts, indentation);
 }
@@ -1200,14 +1201,13 @@ Node* NodeStaticMemberExpression::clone(Node* node) const {
   return Node::clone(new NodeStaticMemberExpression());
 }
 
-Node* NodeStaticMemberExpression::identifier() {
-  this->isAssignment = true;
-  return this;
+bool NodeStaticMemberExpression::isValidlVal() const {
+  return true;
 }
 
 //
 // NodeDynamicMemberExpression: object access via foo['bar']
-NodeDynamicMemberExpression::NodeDynamicMemberExpression(const unsigned int lineno /* = 0 */) : NodeExpression(lineno), isAssignment(false) {}
+NodeDynamicMemberExpression::NodeDynamicMemberExpression(const unsigned int lineno /* = 0 */) : NodeExpression(lineno) {}
 
 Node* NodeDynamicMemberExpression::clone(Node* node) const {
   return Node::clone(new NodeDynamicMemberExpression());
@@ -1218,9 +1218,8 @@ rope_t NodeDynamicMemberExpression::render(render_guts_t* guts, int indentation)
     "[" + this->_childNodes.back()->render(guts, indentation) + "]";
 }
 
-Node* NodeDynamicMemberExpression::identifier() {
-  this->isAssignment = true;
-  return this;
+bool NodeDynamicMemberExpression::isValidlVal() const {
+  return true;
 }
 
 //

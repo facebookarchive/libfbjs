@@ -30,7 +30,7 @@ libfbjs.a: parser.yacc.o parser.lex.o parser.o node.o dmg_fp_dtoa.o dmg_fp_g_fmt
 libfbjs.so: libfbjs.a fbjs.o
 	$(CC) -fPIC -shared $^ -o $@
 
-fbjs: cli.cpp libfbjs.a
+fbjs: cli.cpp fbjs.cpp libfbjs.a
 	$(CXX) -ggdb -Wall $^ -o $@
 
 troy: troy.cpp libfbjs.a

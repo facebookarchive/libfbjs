@@ -42,29 +42,35 @@ const NodeExpression* findExpression(const Node* node) {
 }
 
 int main(int argc, char* argv[]) {
-  NodeProgram root(stdin);
-  bool optimize = false;
-  bool crush = false;
+  try {
+    NodeProgram root(stdin); // parses
+    bool optimize = false;
+    bool crush = false;
 
-  // Perform expression substitution
-  for (int ii = 1; ii < argc; ++ii) {
-    if (strcmp(argv[ii], "-r") == 0) {
-      NodeProgram left(argv[++ii]);
-      NodeProgram right(argv[++ii]);
-      replace(&root, findExpression(&left), findExpression(&right));
-    } else if (strcmp(argv[ii], "-o") == 0) {
-      optimize = true;
-    } else if (strcmp(argv[ii], "-c") == 0) {
-      crush = true;
+    // Perform expression substitution
+    for (int ii = 1; ii < argc; ++ii) {
+      if (strcmp(argv[ii], "-r") == 0) {
+        NodeProgram left(argv[++ii]);
+        NodeProgram right(argv[++ii]);
+        replace(&root, findExpression(&left), findExpression(&right));
+      } else if (strcmp(argv[ii], "-o") == 0) {
+        optimize = true;
+      } else if (strcmp(argv[ii], "-c") == 0) {
+        crush = true;
+      }
     }
-  }
 
-  // Simply the AST
-  if (optimize) {
-    root.reduce();
-  }
+    // Simplify the AST
+    if (optimize) {
+      root.reduce();
+    }
 
-  // Print
-  cout << root.render(crush ? RENDER_NONE : RENDER_PRETTY).c_str() << "\n";
-  return 0;
+    // Print
+    cout << root.render(crush ? RENDER_NONE : RENDER_PRETTY).c_str() << "\n";
+    return 0;
+
+  } catch (ParseException ex) {
+    printf("Parse Error: %s", ex.what());
+    return 1;
+  }
 }

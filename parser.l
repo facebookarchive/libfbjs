@@ -16,15 +16,12 @@ using namespace fbjs;
     unput(yytext[l]); \
   }
 
-#define YY_INPUT(buf,result,max_size) FBJS_INPUT(buf,result,max_size,YY_CURRENT_BUFFER_LVALUE->yy_is_interactive,yyg)
-inline void FBJS_INPUT(char* buf, int &result, int max_size, bool is_interactive, struct yyguts_t* yyg);
 int parsertok_(void*, int);
 %}
 
 %option noyywrap
 %option reentrant
-%option bison-bridge
-%option bison-locations
+%option bison-bridge bison-locations
 
 %s IDENTIFIER
 %x DOT
@@ -377,43 +374,4 @@ int parsertok_(void* guts, int tok) {
   printf("--> %d\n", tok);
 #endif
   return tok;
-}
-
-// TODO: YY_BUFFER_STATE yy_scan_string ( const char *str )
-inline void FBJS_INPUT(char* buf, int &result, int max_size, bool is_interactive, struct yyguts_t* yyg) {
-#define yyscanner yyg
-  if (yyextra->strstream == NULL) {
-    // This code is copied from the original YY_INPUT macro
-    if (is_interactive) {
-      int c = '*', n;
-      for (n = 0; n < max_size && (c = getc(yyin)) != EOF && c != '\n'; ++n) {
-        buf[n] = (char)c;
-      }
-      if (c == '\n') {
-        buf[n++] = (char)c;
-      }
-      if (c == EOF && ferror(yyin)) {
-        YY_FATAL_ERROR( "input in flex scanner failed" );
-      }
-      result = n;
-    } else {
-      errno = 0;
-      while ((result = fread(buf, 1, max_size, yyin)) == 0 && ferror(yyin)) {
-        if (errno != EINTR) {
-          YY_FATAL_ERROR( "input in flex scanner failed" );
-          break;
-        }
-        errno = 0;
-        clearerr(yyin);
-      }
-    }
-  } else {
-    // This is here to parse from a char*
-    int ii = 0;
-    for (; ii < max_size && *yyextra->strstream != 0; ++ii) {
-      buf[ii] = *yyextra->strstream++;
-    }
-    result = ii;
-  }
-#undef yyscanner
 }

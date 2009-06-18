@@ -175,7 +175,6 @@ regex_literal:
 
 string_literal:
     t_STRING {
-      // TODO: get rid of the 2nd parameter here, maybe...
       $$ = new NodeStringLiteral($1, true, yylineno);
       free($1);
     }
@@ -406,14 +405,14 @@ pre_in_expression:
     }
 |   t_INCR pre_in_expression {
       $$ = (new NodeUnary(INCR_UNARY, yylineno))->appendChild($2);
-      if ($2->identifier() == NULL) {
+      if (!static_cast<NodeExpression*>($2)->isValidlVal()) {
         parsererror("invalid increment operand");
         $$ = NULL;
       }
     }
 |   t_DECR pre_in_expression {
       $$ = (new NodeUnary(DECR_UNARY, yylineno))->appendChild($2);
-      if ($2->identifier() == NULL) {
+      if (!static_cast<NodeExpression*>($2)->isValidlVal()) {
         parsererror("invalid decrement operand");
         $$ = NULL;
       }
@@ -515,7 +514,7 @@ conditional_expression:
 assignment_expression:
     conditional_expression
 |   left_hand_side_expression assignment_operator assignment_expression {
-      if ($1->identifier() == NULL) {
+      if (!static_cast<NodeExpression*>($1)->isValidlVal()) {
         parsererror("invalid assignment left-hand side");
         $$ = NULL;
       } else {
@@ -596,7 +595,7 @@ conditional_expression_no_in:
 assignment_expression_no_in:
     conditional_expression_no_in
 |   left_hand_side_expression assignment_operator assignment_expression_no_in {
-      if ($1->identifier() == NULL) {
+      if (!static_cast<NodeExpression*>($1)->isValidlVal()) {
         parsererror("invalid assignment left-hand side");
         $$ = NULL;
       } else {
@@ -680,14 +679,14 @@ pre_in_expression_no_statement:
     }
 |   t_INCR pre_in_expression {
       $$ = (new NodeUnary(INCR_UNARY, yylineno))->appendChild($2);
-      if ($2->identifier() == NULL) {
+      if (!static_cast<NodeExpression*>($2)->isValidlVal()) {
         parsererror("invalid increment operand");
         $$ = NULL;
       }
     }
 |   t_DECR pre_in_expression {
       $$ = (new NodeUnary(DECR_UNARY, yylineno))->appendChild($2);
-      if ($2->identifier() == NULL) {
+      if (!static_cast<NodeExpression*>($2)->isValidlVal()) {
         parsererror("invalid decrement operand");
         $$ = NULL;
       }
@@ -789,7 +788,7 @@ conditional_expression_no_statement:
 assignment_expression_no_statement:
     conditional_expression_no_statement
 |   left_hand_side_expression_no_statement assignment_operator assignment_expression {
-      if ($1->identifier() == NULL) {
+      if (!static_cast<NodeExpression*>($1)->isValidlVal()) {
         parsererror("invalid assignment left-hand side");
         $$ = NULL;
       } else {

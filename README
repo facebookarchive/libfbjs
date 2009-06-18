@@ -1,1 +1,11 @@
-FBJS is not done yet. This is just checked in so the work so far doesn't have to live in my homedir for eternity.
+NOTES:
+* NodeString expressions are implemented poorly right now. Instead of parsing
+  what's in the string we just grab the raw contents from code. This was just
+  a hack because I didn't feel like writing the state machine to convert \x,
+  \u, \0, etc into bytes.
+* There will be a memory leak when you attempt to parse a program with a syntax
+  error in it. This is because the authority of freeing allocated nodes is left
+  to the parent node. The problem is that the allocated child nodes aren't added
+  to the AST until the very last step. Thus, when a ParseException is raised the
+  allocated nodes are lost since they never became associated with a managed
+  node.
