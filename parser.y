@@ -1111,3 +1111,12 @@ function_body:
     }
 |   statement_list;
 ;
+
+%%
+
+const char* yytokname(int tok) {
+  if (tok < 255) {
+    return "?";
+  }
+  return yytname[tok - 255];
+}

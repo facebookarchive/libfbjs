@@ -5,16 +5,35 @@
 using namespace fbjs;
 
 #ifdef DEBUG_FLEX
-#define FBJSBEGIN(a) if(a!=YY_START)printf("BEGIN(%d)\n", a); BEGIN(a)
+#define FBJSBEGIN(a) if(a!=YY_START) { \
+  switch(a) { \
+    case INITIAL: \
+      fprintf(stderr, "BEGIN(INITIAL)\n"); \
+      break; \
+    case IDENTIFIER: \
+      fprintf(stderr, "BEGIN(IDENTIFIER)\n"); \
+      break; \
+    case DOT: \
+      fprintf(stderr, "BEGIN(DOT)\n"); \
+      break; \
+    case VIRTUAL_SEMICOLON: \
+      fprintf(stderr, "BEGIN(VIRTUAL_SEMICOLON)\n"); \
+      break; \
+    case NO_LINEBREAK: \
+      fprintf(stderr, "BEGIN(NO_LINEBREAK)\n"); \
+      break; \
+    case REGEX: \
+      fprintf(stderr, "BEGIN(REGEX)\n"); \
+      break; \
+    default: \
+      fprintf(stderr, "BEGIN(%d)\n", a); \
+  } \
+  BEGIN(a);}
 #else
 #define FBJSBEGIN(a) BEGIN(a)
 #endif
 
 #define parsertok(a) parsertok_(yyg, a);
-#define NEVERMIND \
-  for (int l = strlen(yytext) - 1; l >= 0; --l) { \
-    unput(yytext[l]); \
-  }
 
 int parsertok_(void*, int);
 %}
@@ -39,7 +58,7 @@ FBJSBEGIN(IDENTIFIER);
   }
   . {
     BEGIN(IDENTIFIER);
-    NEVERMIND;
+    yyless(0);
   }
 }
 <IDENTIFIER,DOT,VIRTUAL_SEMICOLON,NO_LINEBREAK>{
@@ -88,7 +107,7 @@ FBJSBEGIN(IDENTIFIER);
         yyextra->last_tok == t_SEMICOLON || yyextra->last_tok == t_RCURLY) {
       return parsertok(t_ELSE);
     } else {
-      NEVERMIND;
+      yyless(0);
       FBJSBEGIN(INITIAL);
       return t_VIRTUAL_SEMICOLON;
     }
@@ -99,7 +118,7 @@ FBJSBEGIN(IDENTIFIER);
         yyextra->last_tok == t_SEMICOLON || yyextra->last_tok == t_RCURLY) {
       return parsertok(t_WHILE);
     } else {
-      NEVERMIND;
+      yyless(0);
       FBJSBEGIN(INITIAL);
       return t_VIRTUAL_SEMICOLON;
     }
@@ -111,7 +130,7 @@ FBJSBEGIN(IDENTIFIER);
     return parsertok(t_IN);
   }
   [a-zA-Z$_0-9]+ {
-    NEVERMIND;
+    yyless(0);
     if (yyextra->last_tok == t_RPAREN &&
         (yyextra->last_paren_tok == t_IF || yyextra->last_paren_tok == t_DO || yyextra->last_paren_tok == t_FOR ||
          (yyextra->last_paren_tok == t_WHILE && yyextra->last_curly_tok != t_DO))) {
@@ -197,7 +216,7 @@ FBJSBEGIN(IDENTIFIER);
     } else if (c == '\\') {
       c = yyinput(yyscanner);
       if (c == EOF) {
-        NEVERMIND;
+        yyless(0);
         break;
       } else if (c == '\r') {
         str.erase(--str.end());
@@ -211,13 +230,13 @@ FBJSBEGIN(IDENTIFIER);
       } else if (c == '\n') {
         str.erase(--str.end());
       } else if (c == EOF) {
-        NEVERMIND;
+        yyless(0);
         break;
       } else {
         str += c;
       }
     } else if (c == '\n' || c == '\r') {
-      NEVERMIND;
+      yyless(0);
       break;
     }
   }
@@ -248,7 +267,7 @@ FBJSBEGIN(IDENTIFIER);
 }
 "}" {
   if (yyextra->last_tok != t_LCURLY && yyextra->last_tok != t_SEMICOLON && yyextra->last_tok != t_VIRTUAL_SEMICOLON) {
-    NEVERMIND;
+    yyless(0);
     return parsertok(t_VIRTUAL_SEMICOLON);
   }
   if (yyextra->curly_stack.empty()) {
@@ -371,7 +390,7 @@ int parsertok_(void* guts, int tok) {
   }
   yyextra->last_tok = tok;
 #ifdef DEBUG_FLEX
-  printf("--> %d\n", tok);
+  fprintf(stderr, "--> %s\n", yytokname(tok));
 #endif
   return tok;
 }
