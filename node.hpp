@@ -21,7 +21,6 @@
 #pragma once
 #include <stdio.h>
 #include <stdexcept>
-#include <string>
 #include <sstream>
 #include <list>
 #include <ext/rope>
@@ -61,7 +60,7 @@ namespace fbjs {
       virtual bool operator== (const Node&) const;
       virtual bool operator!= (const Node&) const;
 
-      node_list_t& Node::childNodes() const;
+      node_list_t& childNodes() const;
       Node* appendChild(Node* node);
       Node* prependChild(Node* node);
       Node* removeChild(node_list_t::iterator node_pos);
@@ -394,7 +393,7 @@ namespace fbjs {
       virtual Node* clone(Node* node = NULL) const;
       virtual rope_t render(render_guts_t* guts, int indentation) const;
       bool iterator() const; // TODO: kill this
-      Node* NodeVarDeclaration::setIterator(bool iterator);
+      Node* setIterator(bool iterator);
   };
 
   //

@@ -20,6 +20,7 @@
 
 #pragma once
 #include <stdio.h>
+#include <string.h>
 #include <stack>
 
 //#define DEBUG_FLEX

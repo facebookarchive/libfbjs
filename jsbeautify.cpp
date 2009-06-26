@@ -20,7 +20,7 @@
 
 #include "node.hpp"
 #include <iostream>
-#include <string>
+#include <string.h>
 using namespace fbjs;
 using namespace std;
 

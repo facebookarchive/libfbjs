@@ -25,6 +25,7 @@
 #include <set>
 #include <stack>
 #include <stdarg.h>
+#include <assert.h>
 #include "node.hpp"
 
 using namespace std;
@@ -43,7 +44,7 @@ struct fbjsize_guts_t {
 typedef pair<Node*, Node*> node_pair_t;
 
 class NodeFBJSShield: public Node {
-  virtual Node* NodeFBJSShield::clone(Node* node) const;
+  virtual Node* clone(Node* node) const;
 };
 
 Node* fbjsize(Node* node, fbjsize_guts_t* guts);
