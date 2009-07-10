@@ -93,7 +93,7 @@ FBJSBEGIN(IDENTIFIER);
     for (;;) {
       while ((c = yyinput(yyscanner)) != '*' && c != EOF) {
         if (c == '\n') {
-          yylloc->first_line++;
+          ++yylloc->first_line;
           newline = true;
         }
       }
@@ -101,6 +101,9 @@ FBJSBEGIN(IDENTIFIER);
         while ((c = yyinput(yyscanner)) == '*');
         if (c == '/') {
           break;
+        } else if (c == '\n') {
+          ++yylloc->first_line;
+          newline = true;
         }
       }
       if (c == EOF) {
@@ -112,7 +115,7 @@ FBJSBEGIN(IDENTIFIER);
     //   foo = 5/*
     // */bar = 6;
     if (newline) {
-      yylloc->first_line--;
+      --yylloc->first_line;
       unput('\n');
     }
   }
