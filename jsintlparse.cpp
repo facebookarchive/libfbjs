@@ -109,7 +109,7 @@ int main(int argc, char* argv[]) {
         return error_line;
       }
     } catch (ParseException ex) {
-      fprintf(stderr, "parse error: %s\n", ex.what());
+      cerr << " parse error in `" << filename << "': " << ex.what() << endl;
       return 1;
     }
 
