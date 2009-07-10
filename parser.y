@@ -119,6 +119,9 @@
 // Functions
 %type<node> function_expression function_declaration formal_parameter_list function_body
 
+// Errors
+%token t_UNTERMINATED_REGEX_LITERAL
+
 %start program
 %%
 

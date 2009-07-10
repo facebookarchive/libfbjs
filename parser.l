@@ -58,6 +58,7 @@ int parsertok_(void*, int);
 %}
 
 %option noyywrap
+%option nodefault
 %option reentrant
 %option bison-bridge bison-locations
 
@@ -71,7 +72,7 @@ FBJSBEGIN(IDENTIFIER);
 %%
 <NO_LINEBREAK>{
   \n {
-    yylloc->first_line++;
+    ++yylloc->first_line;
     BEGIN(IDENTIFIER);
     return t_VIRTUAL_SEMICOLON;
   }
@@ -163,11 +164,11 @@ FBJSBEGIN(IDENTIFIER);
     }
   }
   \n {
-    yylloc->first_line++;
+    ++yylloc->first_line;
   }
   . {
     FBJSBEGIN(yyextra->virtual_semicolon_last_state);
-    unput(yytext[0]);
+    yyless(0);
   }
 }
 <INITIAL,IDENTIFIER>{
@@ -228,6 +229,10 @@ FBJSBEGIN(IDENTIFIER);
   yylval->string = strdup(yytext);
   return parsertok(t_IDENTIFIER);
 }
+<DOT>{
+  \n ++yylloc->first_line;
+  [^a-zA-Z$_]+ /* om nom nom */
+}
 '|\" {
   std::string str = yytext;
   char c;
@@ -266,22 +271,27 @@ FBJSBEGIN(IDENTIFIER);
   return parsertok(t_STRING);
 }
 <IDENTIFIER>"/" FBJSBEGIN(REGEX);
-<REGEX>(\[([^\]\\]+|\\.)+\]|\\.|[^\/\\])*"/"[A-Za-z]* {
-  size_t len = strlen(yytext);
-  size_t flag_pos = len - 1;
-  while (yytext[flag_pos] != '/') {
-    --flag_pos;
+<REGEX>{
+  (\[([^\]\\\n]+|\\.)+\]|\\.|[^\/\\\n])*"/"[A-Za-z]* {
+    size_t len = strlen(yytext);
+    size_t flag_pos = len - 1;
+    while (yytext[flag_pos] != '/') {
+      --flag_pos;
+    }
+    // regex
+    yylval->string_duple[0] = (char*)malloc(flag_pos + 1);
+    memcpy(yylval->string_duple[0], yytext, flag_pos);
+    yylval->string_duple[0][flag_pos] = 0;
+
+    // flags
+    yylval->string_duple[1] = (char*)malloc(len - flag_pos);
+    memcpy(yylval->string_duple[1], yytext + flag_pos + 1, len - flag_pos);
+
+    return parsertok(t_REGEX);
   }
-  // regex
-  yylval->string_duple[0] = (char*)malloc(flag_pos + 1);
-  memcpy(yylval->string_duple[0], yytext, flag_pos);
-  yylval->string_duple[0][flag_pos] = 0;
-
-  // flags
-  yylval->string_duple[1] = (char*)malloc(len - flag_pos);
-  memcpy(yylval->string_duple[1], yytext + flag_pos + 1, len - flag_pos);
-
-  return parsertok(t_REGEX);
+  .|\n {
+    return parsertok(t_UNTERMINATED_REGEX_LITERAL);
+  }
 }
 "{" {
   yyextra->curly_stack.push(yyextra->last_tok);
@@ -357,7 +367,7 @@ FBJSBEGIN(IDENTIFIER);
 "~"    return parsertok(t_BIT_NOT);
 "="    return parsertok(t_ASSIGN);
 \n {
-  yylloc->first_line++;
+  ++yylloc->first_line;
   if (yyextra->last_tok == t_IDENTIFIER || yyextra->last_tok == t_NUMBER || yyextra->last_tok == t_STRING ||
     yyextra->last_tok == t_REGEX || yyextra->last_tok == t_TRUE || yyextra->last_tok == t_FALSE ||
     yyextra->last_tok == t_RPAREN || yyextra->last_tok == t_RCURLY || yyextra->last_tok == t_RBRACKET ||
@@ -374,7 +384,7 @@ FBJSBEGIN(IDENTIFIER);
     return 0;
   }
 }
-. {
+.|\n {
   // Syntax error!
   return yytext[0];
 }

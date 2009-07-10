@@ -90,7 +90,7 @@ int main(int argc, char* argv[]) {
     return 0;
 
   } catch (ParseException ex) {
-    printf("Parse Error: %s", ex.what());
+    printf("Parse Error: %s\n", ex.what());
     return 1;
   }
 }
