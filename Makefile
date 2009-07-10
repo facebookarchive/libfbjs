@@ -54,6 +54,9 @@ fbjs: cli.cpp fbjs.cpp libfbjs.a
 troy: troy.cpp libfbjs.a
 	$(CXX) -ggdb -Wall $^ -o $@
 
+jsintlparse: jsintlparse.cpp libfbjs.a
+	$(CXX) -ggdb -Wall $^ -o $@
+
 jsbeautify: jsbeautify.cpp libfbjs.a
 	$(CXX) -ggdb -Wall $^ -o $@
 
