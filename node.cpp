@@ -132,8 +132,14 @@ rope_t Node::renderIndentedStatement(render_guts_t* guts, int indentation) const
     if (guts->sanelineno) {
       newline = this->renderLinenoCatchup(guts, ret);
     } else {
-      ret += "\n";
-      newline = true;
+      if (guts->lineno == 2) {
+        ret += "\n";
+        newline = true;
+      } else {
+        // Use lineno property to keep track of whether or not we're on the first line,
+        // to avoid an extra line break at the beginning of the render.
+        guts->lineno = 2;
+      }
     }
     if (guts->pretty && newline) {
       for (int i = 0; i < indentation; ++i) {
@@ -174,7 +180,7 @@ bool Node::renderLinenoCatchup(render_guts_t* guts, rope_t &rope) const {
   return true;
 }
 
-unsigned int  Node::lineno() const {
+unsigned int Node::lineno() const {
   return this->_lineno;
 }
 
