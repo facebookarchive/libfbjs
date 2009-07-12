@@ -63,6 +63,9 @@ jsbeautify: jsbeautify.cpp libfbjs.a
 jsexports: jsexports.cpp libfbjs.a
 	$(CXX) -ggdb -Wall $^ -o $@
 
+jsxmin: jsxmin.cpp libfbjs.a
+	$(CXX) -ggdb -Wall $^ -o $@
+
 clean:
 	$(RM) -f fbjs troy jsbeautify jsexports \
     parser.lex.cpp parser.yacc.cpp parser.yacc.hpp parser.yacc.output \
