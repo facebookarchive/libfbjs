@@ -193,9 +193,7 @@ Node* Node::reduce() {
       continue;
     }
     tmp = (*ii)->reduce();
-    if (tmp == NULL) {
-      this->removeChild(ii);
-    } else if (tmp != *ii) {
+    if (tmp == NULL || tmp != *ii) {
       this->replaceChild(tmp, ii);
     }
     ++ii;
