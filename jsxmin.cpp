@@ -32,7 +32,8 @@ std::string xminjs_id(const char t, const rename_t &scope) {
 void xminjs_minify(Node*      node,
                    rename_t   &file_scope,
                    rename_t   &local_scope,
-                   bool       use_local_scope) {
+                   bool       use_local_scope,
+                   bool       unsafe) {
 
   if (node == NULL) {
     return;
@@ -43,21 +44,22 @@ void xminjs_minify(Node*      node,
   if (typeid(*node) == typeid(NodeStaticMemberExpression)) {
     for_nodes(node, ii) {
       if (ii == node->childNodes().begin()) {
-        xminjs_minify(*ii, file_scope, local_scope, true);
+        xminjs_minify(*ii, file_scope, local_scope, true, unsafe);
       } else {
-        xminjs_minify(*ii, file_scope, local_scope, false);
+        xminjs_minify(*ii, file_scope, local_scope, false, unsafe);
       }
     }
   } else if (typeid(*node) == typeid(NodeObjectLiteralProperty)) {
     //  For {prop: value}, we can't rename the property with local scope rules.
-    xminjs_minify(node->childNodes().front(), file_scope, local_scope, false);
-    xminjs_minify(node->childNodes().back(), file_scope, local_scope, true);
+    xminjs_minify(node->childNodes().front(), file_scope, local_scope, false, unsafe);
+    xminjs_minify(node->childNodes().back(), file_scope, local_scope, true, unsafe);
   } else if (typeid(*node) == typeid(NodeIdentifier)) {
     //  We've found an identifier. Rename it, if possible. The rule here is
     //  that it has to start with exactly one "_" to be a candidate for
     //  renaming.
     NodeIdentifier *n = static_cast<NodeIdentifier*>(node);
-    if (n->name().length() > 1 && n->name()[0] == '_' && n->name()[1] != '_') {
+    if (unsafe &&
+        n->name().length() > 1 && n->name()[0] == '_' && n->name()[1] != '_') {
       if (file_scope.find(n->name()) == file_scope.end()) {
         file_scope[n->name()] = xminjs_id(0, file_scope);
       }
@@ -95,11 +97,11 @@ void xminjs_minify(Node*      node,
 
     //  Finally, recurse with the new scope.
     for_nodes(node, ii) {
-      xminjs_minify(*ii, file_scope, cur_scope, true);
+      xminjs_minify(*ii, file_scope, cur_scope, true, unsafe);
     }
   } else {
     for_nodes(node, ii) {
-      xminjs_minify(*ii, file_scope, local_scope, true);
+      xminjs_minify(*ii, file_scope, local_scope, true, unsafe);
     }
   }
 }
@@ -143,7 +145,15 @@ int main(int argc, char* argv[]) {
   
   rename_t file_scope;
   rename_t local_scope;
-  xminjs_minify(&root, file_scope, local_scope, true);
+  
+  bool unsafe = false;
+  for (int ii = 1; ii < argc; ++ii) {
+    if (strcmp(argv[ii], "--unsafe") == 0) {
+      unsafe = true;
+    }
+  }
+  
+  xminjs_minify(&root, file_scope, local_scope, true, unsafe);
 
   cout << root.render(RENDER_NONE).c_str();
 }
