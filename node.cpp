@@ -962,11 +962,30 @@ Node* NodeIf::clone(Node* node) const {
 
 rope_t NodeIf::render(render_guts_t* guts, int indentation) const {
   rope_t ret;
+
+  // Render the conditional expression
   node_list_t::const_iterator node = this->_childNodes.begin();
   ret += guts->pretty ? "if (" : "if(";
   ret += (*node)->render(guts, indentation);
   ret += ")";
-  ret += (*++node)->renderBlock(false, guts, indentation);
+
+  // If rendering a nested if with no else then {}'s are required, hacky :/
+  ++node;
+  bool needBraces = guts->pretty;
+  if (!needBraces) {
+    Node* firstStatement = (*node)->childNodes().front();
+    while (dynamic_cast<NodeStatementList*>(firstStatement) != NULL) {
+      firstStatement = firstStatement->childNodes().front();
+    }
+    if (dynamic_cast<NodeIf*>(firstStatement) != NULL) {
+      if (firstStatement->childNodes().back() == NULL) {
+        needBraces = true;
+      }
+    }
+  }
+  ret += (*node)->renderBlock(needBraces, guts, indentation);
+
+  // Render else
   if (*++node != NULL) {
     ret += guts->pretty ? " else" : "else";
 
@@ -979,7 +998,7 @@ rope_t NodeIf::render(render_guts_t* guts, int indentation) const {
       ret += (*node)->render(guts, indentation);
     } else {
       rope_t block = (*node)->renderBlock(false, guts, indentation);
-      if (block[0] != '{') {
+      if (block[0] != '{' && block[0] != ' ') {
         ret += " ";
       }
       ret += block;
