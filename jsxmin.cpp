@@ -96,7 +96,13 @@ void xminjs_minify(Node*      node,
     xminjs_build_scope(*(++func), cur_scope);
 
     //  Finally, recurse with the new scope.
+    bool is_func_name = true;
     for_nodes(node, ii) {
+      // Skip the first child, function identifier.
+      if (is_func_name) {
+        is_func_name = false;
+        continue;
+      }
       xminjs_minify(*ii, file_scope, cur_scope, true, unsafe);
     }
   } else {
