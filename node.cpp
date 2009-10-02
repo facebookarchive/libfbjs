@@ -971,7 +971,7 @@ rope_t NodeIf::render(render_guts_t* guts, int indentation) const {
 
   // If rendering a nested if with no else then {}'s are required, hacky :/
   ++node;
-  bool needBraces = guts->pretty;
+  bool needBraces = guts->pretty || (*node)->childNodes().empty();
   if (!needBraces) {
     Node* firstStatement = (*node)->childNodes().front();
     while (dynamic_cast<NodeStatementList*>(firstStatement) != NULL) {
