@@ -44,7 +44,7 @@ void xminjs_minify(Node*      node,
   if (typeid(*node) == typeid(NodeStaticMemberExpression)) {
     for_nodes(node, ii) {
       if (ii == node->childNodes().begin()) {
-        xminjs_minify(*ii, file_scope, local_scope, true, unsafe);
+        xminjs_minify(*ii, file_scope, local_scope, use_local_scope, unsafe);
       } else {
         xminjs_minify(*ii, file_scope, local_scope, false, unsafe);
       }
@@ -52,7 +52,7 @@ void xminjs_minify(Node*      node,
   } else if (typeid(*node) == typeid(NodeObjectLiteralProperty)) {
     //  For {prop: value}, we can't rename the property with local scope rules.
     xminjs_minify(node->childNodes().front(), file_scope, local_scope, false, unsafe);
-    xminjs_minify(node->childNodes().back(), file_scope, local_scope, true, unsafe);
+    xminjs_minify(node->childNodes().back(), file_scope, local_scope, use_local_scope, unsafe);
   } else if (typeid(*node) == typeid(NodeIdentifier)) {
     //  We've found an identifier. Rename it, if possible. The rule here is
     //  that it has to start with exactly one "_" to be a candidate for
@@ -96,18 +96,17 @@ void xminjs_minify(Node*      node,
     xminjs_build_scope(*(++func), cur_scope);
 
     //  Finally, recurse with the new scope.
-    bool is_func_name = true;
+    //  Function name can only be renamed in the parent scope.
     for_nodes(node, ii) {
-      // Skip the first child, function identifier.
-      if (is_func_name) {
-        is_func_name = false;
-        continue;
+      if (ii == node->childNodes().begin()) {
+        xminjs_minify(*ii, file_scope, cur_scope, use_local_scope, unsafe);
+      } else {
+        xminjs_minify(*ii, file_scope, cur_scope, true, unsafe);
       }
-      xminjs_minify(*ii, file_scope, cur_scope, true, unsafe);
     }
   } else {
     for_nodes(node, ii) {
-      xminjs_minify(*ii, file_scope, local_scope, true, unsafe);
+      xminjs_minify(*ii, file_scope, local_scope, use_local_scope, unsafe);
     }
   }
 }
@@ -158,8 +157,10 @@ int main(int argc, char* argv[]) {
       unsafe = true;
     }
   }
-  
-  xminjs_minify(&root, file_scope, local_scope, true, unsafe);
+ 
+  // Starts in the global scope. 
+  xminjs_minify(&root, file_scope, local_scope, false, unsafe);
 
   cout << root.render(RENDER_NONE).c_str();
+  // cout << root.render(RENDER_PRETTY).c_str();
 }
