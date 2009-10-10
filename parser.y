@@ -111,7 +111,7 @@
 %type<node> variable_statement variable_declaration_list variable_declaration initializer
 %type<node> variable_declaration_list_no_in variable_declaration_no_in initializer_no_in
 %type<node> empty_statement expression_statement if_statement iteration_statement continue_statement break_statement return_statement with_statement switch_statement
-%type<node> case_block case_clauses_with_default case_clauses_no_default default_label labelled_statement
+%type<node> case_block case_clauses_opt case_clauses labelled_statement
 %type<duple> case_clause default_clause
 %type<node> throw_statement try_statement finally
 %type<duple> catch
@@ -986,46 +986,42 @@ switch_statement:
 ;
 
 case_block:
-    t_LCURLY case_clauses_with_default t_RCURLY {
+    t_LCURLY case_clauses_opt t_RCURLY {
       $$ = $2;
     }
-|   t_LCURLY case_clauses_no_default t_RCURLY {
-      $$ = $2;
+|   t_LCURLY case_clauses_opt default_clause case_clauses_opt t_RCURLY {
+      $$ = (new NodeStatementList(yylineno))->appendChild($2);
+      $$->appendChild($3[0]);
+      if ($3[1] != NULL) {
+        $$->appendChild($3[1]);
+      }
+      $$->appendChild($4);
     }
-|   t_LCURLY t_RCURLY {
+;
+
+
+case_clauses_opt:
+    /* nothing */ {
       $$ = new NodeStatementList(yylineno);
     }
+|   case_clauses
 ;
 
-case_clauses_with_default:
-    case_clauses_no_default default_clause {
-      $$ = $1->appendChild($2[0]);
-      if ($2[1] != NULL) {
-        $$->appendChild($2[1]);
-      }
-    }
-|   default_clause {
-      $$ = (new NodeCaseClause(yylineno))->appendChild($1[0]);
-      if ($1[1] != NULL) {
-        $$->appendChild($1[1]);
-      }
-    }
-;
-
-case_clauses_no_default:
+case_clauses:
     case_clause {
       $$ = (new NodeStatementList(yylineno))->appendChild($1[0]);
       if ($1[1] != NULL) {
         $$->appendChild($1[1]);
       }
     }
-|   case_clauses_no_default case_clause {
+|   case_clauses case_clause {
       $$ = $1->appendChild($2[0]);
       if ($2[1] != NULL) {
         $$->appendChild($2[1]);
       }
     }
 ;
+
 
 case_clause:
     t_CASE expression t_COLON statement_list {
@@ -1039,21 +1035,14 @@ case_clause:
 ;
 
 default_clause:
-    default_label statement_list {
-      $$[0] = $1;
-      $$[1] = $2;
-    }
-|   default_label {
-      $$[0] = $1;
+    t_DEFAULT t_COLON {
+      $$[0] = new NodeDefaultClause(yylineno);
       $$[1] = NULL;
     }
-;
-
-default_label:
-    t_DEFAULT t_COLON {
-      $$ = new NodeDefaultClause(yylineno);
-    }
-;
+|   t_DEFAULT t_COLON statement_list {
+      $$[0] = new NodeDefaultClause(yylineno);
+      $$[1] = $3;
+};
 
 labelled_statement:
     identifier t_COLON statement {
