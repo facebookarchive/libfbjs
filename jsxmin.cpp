@@ -152,15 +152,17 @@ int main(int argc, char* argv[]) {
   rename_t local_scope;
   
   bool unsafe = false;
+  node_render_enum render_option = RENDER_NONE;
   for (int ii = 1; ii < argc; ++ii) {
     if (strcmp(argv[ii], "--unsafe") == 0) {
       unsafe = true;
+    } else if (strcmp(argv[ii], "--pretty") == 0) {
+      render_option = RENDER_PRETTY;
     }
   }
  
   // Starts in the global scope. 
   xminjs_minify(&root, file_scope, local_scope, false, unsafe);
 
-  cout << root.render(RENDER_NONE).c_str();
-  // cout << root.render(RENDER_PRETTY).c_str();
+  cout << root.render(render_option).c_str();
 }
