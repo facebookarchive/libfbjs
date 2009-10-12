@@ -26,8 +26,12 @@ install:
 parser.lex.cpp: parser.l
 	flex -o$@ -d $<
 
+parser.lex.hpp: parser.lex.cpp
+
 parser.yacc.cpp: parser.y
 	bison --debug --verbose -d -o $@ $<
+
+parser.yacc.hpp: parser.yacc.cpp
 
 dmg_fp_dtoa.c:
 	curl 'http://www.netlib.org/fp/dtoa.c' -o $@
@@ -40,6 +44,11 @@ dmg_fp_dtoa.o: dmg_fp_dtoa.c
 
 dmg_fp_g_fmt.o: dmg_fp_g_fmt.c
 	$(CC) -fPIC -c $< -o $@ -DIEEE_8087=1 -DNO_HEX_FP=1 -DLong=int32_t -DULong=uint32_t -include stdint.h
+
+parser.yacc.o: parser.lex.hpp
+parser.lex.o: parser.yacc.hpp
+parser.o: parser.yacc.hpp
+node.o: parser.yacc.hpp
 
 libfbjs.a: parser.yacc.o parser.lex.o parser.o node.o dmg_fp_dtoa.o dmg_fp_g_fmt.o
 	$(AR) rc $@ $^

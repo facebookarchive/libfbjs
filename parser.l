@@ -121,10 +121,13 @@ FBJSBEGIN(IDENTIFIER);
     }
   }
 }
+<VIRTUAL_SEMICOLON,INITIAL,IDENTIFIER>{
+  "catch"  return parsertok(t_CATCH);
+  "finally"  return parsertok(t_FINALLY);
+  "in"  return parsertok(t_IN);
+  "instanceof"  return parsertok(t_INSTANCEOF);
+}
 <VIRTUAL_SEMICOLON>{
-  "catch" {
-    return parsertok(t_CATCH);
-  }
   "else" {
     if ((yyextra->last_tok == t_RPAREN && (yyextra->last_paren_tok == t_IF || yyextra->last_paren_tok == t_FOR || yyextra->last_paren_tok == t_WHILE)) ||
         yyextra->last_tok == t_SEMICOLON || yyextra->last_tok == t_RCURLY) {
@@ -145,12 +148,6 @@ FBJSBEGIN(IDENTIFIER);
       FBJSBEGIN(INITIAL);
       return t_VIRTUAL_SEMICOLON;
     }
-  }
-  "finally" {
-    return parsertok(t_FINALLY);
-  }
-  "in" {
-    return parsertok(t_IN);
   }
   [a-zA-Z$_0-9]+ {
     yyless(0);
@@ -174,18 +171,14 @@ FBJSBEGIN(IDENTIFIER);
 <INITIAL,IDENTIFIER>{
   "break"  return parsertok(t_BREAK);
   "case"  return parsertok(t_CASE);
-  "catch"  return parsertok(t_CATCH);
   "continue"  return parsertok(t_CONTINUE);
   "default"  return parsertok(t_DEFAULT);
   "delete"  return parsertok(t_DELETE);
   "do"  return parsertok(t_DO);
   "else"  return parsertok(t_ELSE);
-  "finally"  return parsertok(t_FINALLY);
   "for"  return parsertok(t_FOR);
   "function" return parsertok(t_FUNCTION);
   "if"  return parsertok(t_IF);
-  "in"  return parsertok(t_IN);
-  "instanceof"  return parsertok(t_INSTANCEOF);
   "new"  return parsertok(t_NEW);
   "return"  return parsertok(t_RETURN);
   "switch"  return parsertok(t_SWITCH);
