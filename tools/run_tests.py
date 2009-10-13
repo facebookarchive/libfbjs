@@ -92,6 +92,9 @@ def GetOptionParser():
                     help='JS engine path, e.g., ./tools/js')
   parser.add_option('--jsxmin', action='store', type='string', dest='jsxmin',
                     help='JSXMIN binary path, e.g., ./jsxmin')
+  parser.add_option('--jsxminargs', action='store', type='string',
+                    dest='jsxminargs',
+                    help='arguments passed to jsxmin, e.g, --pretty')
   parser.add_option('--verbose', action='store', type='int', dest='verbose',
                     default=0, help='Verbose level, e.g., 1, 2')
   return parser

@@ -1,0 +1,12 @@
+Testing tools directory:
+
+js : SpiderMonkey 1.7 executable
+
+run_tests.py :
+  compare test results before and after jsxminification, useful for testing
+  js unit tests
+
+jsxminify_dir.py:
+  jsxminify js files under a directory, useful for testing large benchmark
+  suite. original js files are renamed to .<orig js file name>.orig,
+  and -r option restores original file content.
