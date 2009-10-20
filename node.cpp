@@ -942,6 +942,14 @@ Node* NodeFunctionCall::reduce() {
   return this;
 }
 
+bool NodeFunctionCall::isEval() const {
+  NodeIdentifier* iden = dynamic_cast<NodeIdentifier*>(this->_childNodes.front());
+  if (iden != NULL && iden->name() == "eval") {
+    return true;
+  }
+  return false;
+}
+
 //
 // NodeFunctionConstructor: new foo(1)
 NodeFunctionConstructor::NodeFunctionConstructor(const unsigned int lineno /* = 0 */) : NodeExpression(lineno) {}

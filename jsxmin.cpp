@@ -13,6 +13,7 @@ typedef map<string, string> rename_t;
                            ++i)
 
 void xminjs_build_scope(Node *node, rename_t &local_scope);
+bool xminjs_function_has_with_or_eval(Node* node);
 
 std::string xminjs_id(const char t, const rename_t &scope) {
   char buf[16];
@@ -68,8 +69,9 @@ void xminjs_minify(Node*      node,
                local_scope.find(n->name()) != local_scope.end()) {
       n->rename(local_scope[n->name()]);
     }
-  } else if (typeid(*node) == typeid(NodeFunctionDeclaration) ||
-             typeid(*node) == typeid(NodeFunctionExpression)) {
+  } else if ( (typeid(*node) == typeid(NodeFunctionDeclaration) ||
+               typeid(*node) == typeid(NodeFunctionExpression)) &&
+              !xminjs_function_has_with_or_eval(node) ){
     
     node_list_t::iterator func = node->childNodes().begin();
 
@@ -109,6 +111,43 @@ void xminjs_minify(Node*      node,
       xminjs_minify(*ii, file_scope, local_scope, use_local_scope, unsafe);
     }
   }
+}
+
+
+// Iterate through all child nodes and find if it contains with or eval
+// statement, it also recursively check sub functions.
+bool xminjs_function_has_with_or_eval(Node* node) {
+  if (node == NULL) {
+    return false;
+  }
+
+  for_nodes(node, ii) {
+    Node* child = *ii;
+    if (child == NULL) {
+      continue;
+    }
+
+    if (typeid(*child) == typeid(NodeWith)) {
+      return true;
+    }
+
+    NodeFunctionCall* call = dynamic_cast<NodeFunctionCall*>(child);
+    if (call != NULL && call->isEval()) {
+      return true;
+    }
+
+    if ( (typeid(*child) == typeid(NodeFunctionDeclaration) ||
+          typeid(*child) == typeid(NodeFunctionExpression)) && 
+         xminjs_function_has_with_or_eval(child) ) {
+      return true;
+      // Don't check the current child node again if it is a function
+      // declaration or expression.
+
+    } else if (xminjs_function_has_with_or_eval(child)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 void xminjs_build_scope(Node *node, rename_t &local_scope) {
@@ -165,4 +204,8 @@ int main(int argc, char* argv[]) {
   xminjs_minify(&root, file_scope, local_scope, false, unsafe);
 
   cout << root.render(render_option).c_str();
+
+  if (render_option == RENDER_PRETTY) {
+    cout << "\n";
+  }
 }

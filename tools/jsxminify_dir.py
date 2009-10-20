@@ -12,13 +12,15 @@ import time
 
 RESTORE = False
 JSXMIN = None
-JSXMINARGS = None
+PRETTY = False 
 VERBOSE = 0
 
 def Jsxminify(orig, dest):
-  if VERBOSE >= 2: print '%s < %s > %s ...' % (JSXMIN, orig, dest)
+  cmd = JSXMIN
+  if PRETTY :
+    cmd = '%s --pretty' % cmd
 
-  cmd = '%s %s' % (JSXMIN, JSXMINARGS)
+  if VERBOSE >= 1: print '%s < %s > %s ...' % (cmd, orig, dest)
 
   (fd_out, outname) = tempfile.mkstemp()
   (fd_err, errname) = tempfile.mkstemp()
@@ -112,15 +114,15 @@ def GetOptionParser():
                     default=False, help='Restore to the original js files')
   parser.add_option('--jsxmin', action='store', type='string', dest='jsxmin',
                     help='JSXMIN binary path, e.g., ./jsxmin')
-  parser.add_option('--jsxminargs', action='store', type='string',
-                    dest='jsxminargs',
-                    help='Arguments passed to jsxmin, e.g., --pretty')
+  parser.add_option('--pretty', action='store_true', dest='pretty',
+                    default=False,
+                    help='Enable --pretty option in jsxmin')
   parser.add_option('--verbose', action='store', type='int', dest='verbose',
                     default=0, help='Verbose level, e.g., 1, 2')
   return parser
 
 def Main():
-  global RESTORE, JSXMIN, VERBOSE
+  global RESTORE, JSXMIN, VERBOSE, PRETTY
 
   parser = GetOptionParser()
   (options, args) = parser.parse_args()
@@ -138,7 +140,7 @@ def Main():
 
   VERBOSE = options.verbose
   RESTORE = options.restore
-  JSXMINARGS = options.jsxminargs
+  PRETTY = options.pretty
 
   if not args:
     parser.print_help()
