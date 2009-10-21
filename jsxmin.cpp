@@ -15,14 +15,25 @@ typedef map<string, string> rename_t;
 void xminjs_build_scope(Node *node, rename_t &local_scope);
 bool xminjs_function_has_with_or_eval(Node* node);
 
-std::string xminjs_id(const char t, const rename_t &scope) {
+
+// Global flags
+bool g_always_rename = false;
+bool g_unsafe = false;
+
+std::string xminjs_id(const char t, const rename_t &scope,
+                      const std::string& orig_name) {
   char buf[16];
   if (t) {
     snprintf(buf, 16, "_%c%x", t, (unsigned int)scope.size());
   } else {
     snprintf(buf, 16, "_%x", (unsigned int)scope.size());
   }
-  return string(buf);
+  string new_name(buf);
+  if (g_always_rename) {
+    return new_name;
+  } else {
+    return new_name.length() < orig_name.length() ? new_name : orig_name;
+  }
 }
 
 /**
@@ -33,8 +44,7 @@ std::string xminjs_id(const char t, const rename_t &scope) {
 void xminjs_minify(Node*      node,
                    rename_t   &file_scope,
                    rename_t   &local_scope,
-                   bool       use_local_scope,
-                   bool       unsafe) {
+                   bool       use_local_scope) {
 
   if (node == NULL) {
     return;
@@ -45,24 +55,24 @@ void xminjs_minify(Node*      node,
   if (typeid(*node) == typeid(NodeStaticMemberExpression)) {
     for_nodes(node, ii) {
       if (ii == node->childNodes().begin()) {
-        xminjs_minify(*ii, file_scope, local_scope, use_local_scope, unsafe);
+        xminjs_minify(*ii, file_scope, local_scope, use_local_scope);
       } else {
-        xminjs_minify(*ii, file_scope, local_scope, false, unsafe);
+        xminjs_minify(*ii, file_scope, local_scope, false);
       }
     }
   } else if (typeid(*node) == typeid(NodeObjectLiteralProperty)) {
     //  For {prop: value}, we can't rename the property with local scope rules.
-    xminjs_minify(node->childNodes().front(), file_scope, local_scope, false, unsafe);
-    xminjs_minify(node->childNodes().back(), file_scope, local_scope, use_local_scope, unsafe);
+    xminjs_minify(node->childNodes().front(), file_scope, local_scope, false);
+    xminjs_minify(node->childNodes().back(), file_scope, local_scope, use_local_scope);
   } else if (typeid(*node) == typeid(NodeIdentifier)) {
     //  We've found an identifier. Rename it, if possible. The rule here is
     //  that it has to start with exactly one "_" to be a candidate for
     //  renaming.
     NodeIdentifier *n = static_cast<NodeIdentifier*>(node);
-    if (unsafe &&
+    if (g_unsafe &&
         n->name().length() > 1 && n->name()[0] == '_' && n->name()[1] != '_') {
       if (file_scope.find(n->name()) == file_scope.end()) {
-        file_scope[n->name()] = xminjs_id(0, file_scope);
+        file_scope[n->name()] = xminjs_id(0, file_scope, n->name());
       }
       n->rename(file_scope[n->name()]);
     } else if (use_local_scope &&
@@ -89,7 +99,8 @@ void xminjs_minify(Node*      node,
     for_nodes(*func, arg) {
       NodeIdentifier *arg_node = static_cast<NodeIdentifier*>(*arg);
       if (cur_scope.find(arg_node->name()) == cur_scope.end()) {
-        cur_scope[arg_node->name()] = xminjs_id('L', cur_scope);
+        std::string arg_name = arg_node->name(); 
+        cur_scope[arg_name] = xminjs_id('L', cur_scope, arg_name);
       }
     }
     
@@ -101,14 +112,14 @@ void xminjs_minify(Node*      node,
     //  Function name can only be renamed in the parent scope.
     for_nodes(node, ii) {
       if (ii == node->childNodes().begin()) {
-        xminjs_minify(*ii, file_scope, cur_scope, use_local_scope, unsafe);
+        xminjs_minify(*ii, file_scope, cur_scope, use_local_scope);
       } else {
-        xminjs_minify(*ii, file_scope, cur_scope, true, unsafe);
+        xminjs_minify(*ii, file_scope, cur_scope, true);
       }
     }
   } else {
     for_nodes(node, ii) {
-      xminjs_minify(*ii, file_scope, local_scope, use_local_scope, unsafe);
+      xminjs_minify(*ii, file_scope, local_scope, use_local_scope);
     }
   }
 }
@@ -162,7 +173,8 @@ void xminjs_build_scope(Node *node, rename_t &local_scope) {
     NodeIdentifier *decl_name = dynamic_cast<NodeIdentifier*>(node->childNodes().front());
     if (decl_name) {
       if (local_scope.find(decl_name->name()) == local_scope.end()) {
-        local_scope[decl_name->name()] = xminjs_id('L', local_scope);
+        std::string orig_name = decl_name->name();
+        local_scope[orig_name] = xminjs_id('L', local_scope, orig_name);
       }
     }
     return;
@@ -173,7 +185,8 @@ void xminjs_build_scope(Node *node, rename_t &local_scope) {
         n = dynamic_cast<NodeIdentifier*>((*ii)->childNodes().front());
       }
       if (local_scope.find(n->name()) == local_scope.end()) {
-        local_scope[n->name()] = xminjs_id('L', local_scope);
+        std::string orig_name = n->name();
+        local_scope[orig_name] = xminjs_id('L', local_scope, orig_name);
       }
     }
   } else {
@@ -190,18 +203,22 @@ int main(int argc, char* argv[]) {
   rename_t file_scope;
   rename_t local_scope;
   
-  bool unsafe = false;
+  bool g_unsafe = false;
   node_render_enum render_option = RENDER_NONE;
   for (int ii = 1; ii < argc; ++ii) {
     if (strcmp(argv[ii], "--unsafe") == 0) {
-      unsafe = true;
+      g_unsafe = true;
+
     } else if (strcmp(argv[ii], "--pretty") == 0) {
       render_option = RENDER_PRETTY;
+
+    } else if (strcmp(argv[ii], "--always-rename") == 0) {
+      g_always_rename = true;
     }
   }
  
   // Starts in the global scope. 
-  xminjs_minify(&root, file_scope, local_scope, false, unsafe);
+  xminjs_minify(&root, file_scope, local_scope, false);
 
   cout << root.render(render_option).c_str();
 
