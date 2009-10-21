@@ -16,7 +16,13 @@
 # 
 # @author Marcel Laverdet
 
-CPPFLAGS=-fPIC -Wall -ggdb
+CPPFLAGS=-fPIC -Wall
+
+ifdef OPT
+  CPPFLAGS += -O2
+else
+  CPPFLAGS += -ggdb
+endif
 
 all: libfbjs.so
 

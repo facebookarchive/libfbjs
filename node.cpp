@@ -256,7 +256,7 @@ rope_t NodeStatementList::renderBlock(bool must, render_guts_t* guts, int indent
     if (guts->sanelineno) {
       this->renderLinenoCatchup(guts, ret);
     }
-    ret += this->_childNodes.front()->renderStatement(guts, indentation);
+    ret += this->_childNodes.front()->renderBlock(must, guts, indentation);
     return ret;
   } else {
     rope_t ret(guts->pretty ? " {" : "{");
