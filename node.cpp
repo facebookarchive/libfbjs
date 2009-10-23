@@ -977,35 +977,28 @@ rope_t NodeIf::render(render_guts_t* guts, int indentation) const {
   ret += (*node)->render(guts, indentation);
   ret += ")";
 
-  // If rendering a nested if with no else then {}'s are required, hacky :/
-  ++node;
-  bool needBraces = guts->pretty || (*node)->childNodes().empty();
-  if (!needBraces) {
-    Node* firstStatement = (*node)->childNodes().front();
-    while (dynamic_cast<NodeStatementList*>(firstStatement) != NULL) {
-      firstStatement = firstStatement->childNodes().front();
-    }
-    if (dynamic_cast<NodeIf*>(firstStatement) != NULL) {
-      if (firstStatement->childNodes().back() == NULL) {
-        needBraces = true;
-      }
-    }
-  }
-  ret += (*node)->renderBlock(needBraces, guts, indentation);
+  // Currently we need braces if it has else statement
+  // TODO: braces are not needed if no nested-if statement.
+  Node* ifBlock = *++node;
+  Node* elseBlock = *++node;
+
+  bool needBraces = guts->pretty || ifBlock->childNodes().empty()
+                    || elseBlock != NULL;
+  ret += ifBlock->renderBlock(needBraces, guts, indentation);
 
   // Render else
-  if (*++node != NULL) {
+  if (elseBlock != NULL) {
     ret += guts->pretty ? " else" : "else";
 
     // Special-case for rendering else if's
-    if (typeid(**node) == typeid(NodeIf)) {
+    if (typeid(*elseBlock) == typeid(NodeIf)) {
       if (guts->sanelineno) {
-        (*node)->renderLinenoCatchup(guts, ret);
+        elseBlock->renderLinenoCatchup(guts, ret);
       }
       ret += " ";
-      ret += (*node)->render(guts, indentation);
+      ret += elseBlock->render(guts, indentation);
     } else {
-      rope_t block = (*node)->renderBlock(false, guts, indentation);
+      rope_t block = elseBlock->renderBlock(false, guts, indentation);
       if (block[0] != '{' && block[0] != ' ') {
         ret += " ";
       }
