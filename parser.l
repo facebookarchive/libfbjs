@@ -207,10 +207,11 @@ FBJSBEGIN(IDENTIFIER);
   yylval->number = (double)val;
   return parsertok(t_NUMBER);
 }
-[0-9]*\.?[0-9]+[eE]-?[0-9]{1,3}  {
-  float val;
-  sscanf(yytext, "%e", &val);
-  yylval->number = (double)val;
+[0-9]*\.?[0-9]+[eE][\-+]?[0-9]{1,3}  {
+  double val;
+  char *se;
+  val = strtod(yytext, &se);
+  yylval->number = val;
   return parsertok(t_NUMBER);
 }
 [0-9]+\.? |
