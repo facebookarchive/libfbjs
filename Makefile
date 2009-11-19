@@ -21,7 +21,7 @@ CPPFLAGS=-fPIC -Wall
 ifdef OPT
   CPPFLAGS += -O2
 else
-  CPPFLAGS += -ggdb
+  CPPFLAGS += -ggdb -g -O0 -DDEBUG
 endif
 
 all: libfbjs.so
@@ -78,8 +78,8 @@ jsbeautify: jsbeautify.cpp libfbjs.a
 jsexports: jsexports.cpp libfbjs.a
 	$(CXX) -ggdb -Wall $^ -o $@
 
-jsxmin: jsxmin.cpp libfbjs.a
-	$(CXX) -ggdb -Wall $^ -o $@
+jsxmin: jsxmin_main.cpp jsxmin_renaming.cpp libfbjs.a
+	$(CXX) $(CPPFLAGS) -Wall $^ -o $@
 
 clean:
 	$(RM) -f fbjs troy jsbeautify jsexports \

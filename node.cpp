@@ -19,9 +19,71 @@
 */
 
 #include "node.hpp"
+
+#include <set>
+
 extern "C" char* g_fmt(char*, double);
 using namespace std;
 using namespace fbjs;
+
+// Returns true if a given id is reserved JS keywords, see ECMA-262 sect 7.5.1
+static bool is_reserved_keyword(string id) {
+  static std::set<std::string> keyword_set;
+  static bool initialized = false;
+  if (!initialized) {
+    initialized = true;
+    static char* keywords[] = {
+      // Keywords
+      "break", "case", "catch", "continue", "default", "delete", "do", "else",
+      "finally", "for", "function", "if", "in", "instanceof", "new", "return",
+      "switch", "this", "throw", "try", "typeof", "var", "void", "while",
+      "with",
+      // Future reserved words
+      //   Our code does not respect future reserved keywords anyway.
+      //
+      // "abstract", "boolean", "byte", "char", "class", "const", "debugger",
+      // "double, "enum", "export", "extends", "final", "float", "goto",
+      // "implements", "import", "int", "interface", "long", "native",
+      // "package", "private", "protected", "public", "short", "static",
+      // "super", "synchronized", "throws", "transient", "volatile",
+      //
+      // NullLiteral and BooleanLiteral
+      "true", "false", "null",
+      NULL
+    };
+    for (char** ptr = keywords; *ptr != NULL; ptr++) {
+      keyword_set.insert(*ptr);
+    }
+  }
+  return keyword_set.find(id) != keyword_set.end();
+}
+
+// Returns true if a given string is a JS identifier.
+// NOTE: the function does not recognize escaped unicode as identifiers
+static bool is_identifier(std::string id) {
+  // "[a-zA-Z$_][a-zA-Z$_0-9]*]"
+  if (id.size() == 0) return false;
+
+  if (is_reserved_keyword(id)) return false;
+
+  char first = id[0];
+  if (!isalpha(first) && 
+      first != '$' &&
+      first != '_') {
+    return false;
+  }
+
+  for (int i = 1; i < id.size(); i++) {
+    char c = id[i];
+    if (!isalpha(c) && 
+        !isdigit(c) &&
+        c != '$' &&
+        c != '_') {
+      return false;
+    }
+  }
+  return true;
+}
 
 //
 // Node: All other nodes inherit from this.
@@ -1218,6 +1280,31 @@ Node* NodeObjectLiteralProperty::clone(Node* node) const {
   return Node::clone(new NodeObjectLiteralProperty());
 }
 
+Node* NodeObjectLiteralProperty::reduce() {
+  Node::reduce();
+  if (this->childNodes().size() == 0) {
+    return this;
+  }
+
+  Node* prop_name = this->childNodes().front();
+  if (typeid(*prop_name) != typeid(NodeStringLiteral)) {
+    return this;
+  }
+
+  NodeStringLiteral* lit = static_cast<NodeStringLiteral*>(prop_name);
+  // We can only rewrite the expression when unquoted_value() can be an
+  // identifier.
+  std::string maybe_id = lit->unquoted_value();
+  if (!is_identifier(maybe_id)) {
+    return this;
+  }
+  
+  NodeIdentifier* id = new NodeIdentifier(maybe_id, lit->lineno());
+  NodeObjectLiteralProperty* result = new NodeObjectLiteralProperty(lineno());
+  // Caller's responsibility to delete this.
+  return result->appendChild(id)->appendChild(this->childNodes().back());
+}
+
 rope_t NodeObjectLiteralProperty::render(render_guts_t* guts, int indentation) const {
   return rope_t(this->_childNodes.front()->render(guts, indentation)) + (guts->pretty ? ": " : ":") +
     this->_childNodes.back()->render(guts, indentation);
@@ -1252,6 +1339,27 @@ bool NodeStaticMemberExpression::isValidlVal() const {
 //
 // NodeDynamicMemberExpression: object access via foo['bar']
 NodeDynamicMemberExpression::NodeDynamicMemberExpression(const unsigned int lineno /* = 0 */) : NodeExpression(lineno) {}
+
+Node* NodeDynamicMemberExpression::reduce() {
+  Node::reduce();
+  Node* subscription = this->childNodes().back();
+  if (typeid(*subscription) != typeid(NodeStringLiteral)) {
+    return this;
+  }
+
+  NodeStringLiteral* lit = static_cast<NodeStringLiteral*>(subscription);
+  // We can only rewrite the expression when unquoted_value() can be an
+  // identifier. Quick hack, if the identifier contains 
+  std::string maybe_id = lit->unquoted_value();
+  if (!is_identifier(maybe_id)) {
+    return this;
+  }
+  
+  NodeIdentifier* id = new NodeIdentifier(maybe_id, lit->lineno());
+  Node* result = new NodeStaticMemberExpression(this->lineno());
+  // Caller's responsibility to delete this.
+  return result->appendChild(this->childNodes().front())->appendChild(id);
+}
 
 Node* NodeDynamicMemberExpression::clone(Node* node) const {
   return Node::clone(new NodeDynamicMemberExpression());

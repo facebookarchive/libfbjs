@@ -131,6 +131,11 @@ namespace fbjs {
       bool quoted;
     public:
       NodeStringLiteral(std::string value, bool quoted, const unsigned int lineno = 0);
+      std::string unquoted_value() {
+        if (!quoted) return value;
+        return value.substr(1, value.size() - 2);
+      }
+      
       virtual Node* clone(Node* node = NULL) const;
       virtual rope_t render(render_guts_t* guts, int indentation) const;
       virtual bool operator== (const Node&) const;
@@ -355,6 +360,7 @@ namespace fbjs {
   class NodeDynamicMemberExpression: public NodeExpression {
     public:
       NodeDynamicMemberExpression(const unsigned int lineno = 0);
+      virtual Node* reduce();
       virtual Node* clone(Node* node = NULL) const;
       virtual rope_t render(render_guts_t* guts, int indentation) const;
       virtual bool isValidlVal() const;
@@ -496,6 +502,7 @@ namespace fbjs {
   class NodeObjectLiteralProperty: public Node {
     public:
       NodeObjectLiteralProperty(const unsigned int lineno = 0);
+      virtual Node* reduce();
       virtual Node* clone(Node* node = NULL) const;
       virtual rope_t render(render_guts_t* guts, int indentation) const;
   };
@@ -544,4 +551,5 @@ namespace fbjs {
       ParseException(const std::string msg);
       const char* what() const throw();
   };
+
 }
