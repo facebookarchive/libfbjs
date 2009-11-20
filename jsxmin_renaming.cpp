@@ -1,11 +1,10 @@
 #include "node.hpp"
 #include "jsxmin_renaming.h"
+#include "gflags/gflags.h"
 
+#include <assert.h>
 #include <stdio.h>
-
-#ifdef DEBUG
 #include <iostream>
-#endif
 
 // Varaible renaming of JS files.
 // This file includes three renaming strategies:
@@ -65,6 +64,14 @@
 //   another constructor function (as its parent class) that adds a property
 //   named _bar. Because the child and parent constructor functions are in
 //   different files, both can get renamed to the same name.
+
+DEFINE_bool(variable_renaming, true, "Enable variable renaming"); 
+DEFINE_bool(rename_globals, false,
+            "Unsafely rename global varaibles starting with '_'"); 
+DEFINE_bool(property_renaming, false,
+            "Unsafely rename properties starting with '_'");
+
+DECLARE_bool(debug);
 
 using namespace std;
 using namespace fbjs;
@@ -133,10 +140,7 @@ bool Scope::in_use(string name) {
 }
 
 
-#ifdef DEBUG
 void Scope::dump() {
-//  if (true) return;
-
   int indention = 0;
   Scope* parent = _parent;
   while (parent != NULL) {
@@ -154,18 +158,13 @@ void Scope::dump() {
     cout << it->first.c_str() << " -> " << it->second.c_str() << "\n";
   }
 }
-#endif
 
 bool LocalScope::need_rename(const string& name) {
   return name != "event";
 }
 
 void LocalScope::rename_vars() {
-#ifdef DEBUG
-  NameFactory factory("LOCAL_");
-#else
-  NameFactory factory;
-#endif
+  NameFactory factory(FLAGS_debug ? "LOCAL_" : "");
 
   for (rename_t::iterator it = _replacement.begin();
        it != _replacement.end();
@@ -220,8 +219,8 @@ void GlobalScope::rename_var(const string& var_name) {
 }
 
 // ----- VariableRenaming ---- 
-VariableRenaming::VariableRenaming(bool rename_globals) {
-  this->_global_scope = new GlobalScope(rename_globals);
+VariableRenaming::VariableRenaming() {
+  this->_global_scope = new GlobalScope(FLAGS_rename_globals);
 }
 
 VariableRenaming::~VariableRenaming() {
@@ -229,6 +228,10 @@ VariableRenaming::~VariableRenaming() {
 }
 
 void VariableRenaming::process(NodeProgram* root) {
+  if (!FLAGS_variable_renaming) {
+    return;
+  }
+
   // Collect all symbols in the file scope
   build_scope(root, this->_global_scope);
   this->_global_scope->rename_vars();
@@ -236,9 +239,9 @@ void VariableRenaming::process(NodeProgram* root) {
   // Starts in the global scope. 
   minify(root, this->_global_scope);
 
-#ifdef DEBUG
-  this->_global_scope->dump();
-#endif
+  if (FLAGS_debug) {
+    this->_global_scope->dump();
+  }
 }
 
 void VariableRenaming::minify(Node* node, Scope* scope) {
@@ -287,9 +290,9 @@ void VariableRenaming::minify(Node* node, Scope* scope) {
     // Build renaming map in local scope
     child_scope.rename_vars();
 
-#ifdef DEBUG
-    child_scope.dump();
-#endif
+    if (FLAGS_debug) {
+      child_scope.dump();
+    }
 
     //  Finally, recurse with the new scope.
     //  Function name can only be renamed in the parent scope.
@@ -387,13 +390,18 @@ PropertyRenaming::~PropertyRenaming() {
 }
 
 void PropertyRenaming::process(NodeProgram* root) {
+  if (!FLAGS_property_renaming) {
+    return;
+  }
+
   // Rewrite nodes, this is necessary to make property renaming work correctly.
   // e.g., a['foo'] -> a.foo, and { 'foo' : 1 } -> { foo : 1 }.
   root->reduce();
   minify(root);
-#ifdef DEBUG
-  this->_property_scope->dump();
-#endif
+
+  if (FLAGS_debug) {
+    this->_property_scope->dump();
+  }
 }
 
 void PropertyRenaming::minify(Node* node) {
@@ -422,7 +430,9 @@ void PropertyRenaming::minify(Node* node) {
 
     // Must be NodeIdentifier.
     NodeIdentifier* n =
-        static_cast<NodeIdentifier*>(node->childNodes().back());
+        dynamic_cast<NodeIdentifier*>(node->childNodes().back());
+    assert(n != NULL);
+
     if (_property_scope->need_rename(n->name())) {
       string name = n->name();
       if (!_property_scope->declared(name)) {

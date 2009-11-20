@@ -78,8 +78,8 @@ jsbeautify: jsbeautify.cpp libfbjs.a
 jsexports: jsexports.cpp libfbjs.a
 	$(CXX) -ggdb -Wall $^ -o $@
 
-jsxmin: jsxmin_main.cpp jsxmin_renaming.cpp libfbjs.a
-	$(CXX) $(CPPFLAGS) -Wall $^ -o $@
+jsxmin: jsxmin_main.cpp jsxmin_renaming.cpp jsxmin_reduction.cpp gflags/gflags.cc gflags/gflags_reporting.cc libfbjs.a
+	$(CXX) $(CPPFLAGS) -Wall -I. $^ -o $@ -lpthread
 
 clean:
 	$(RM) -f fbjs troy jsbeautify jsexports \

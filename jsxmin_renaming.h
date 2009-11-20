@@ -55,9 +55,7 @@ public:
   // This function returns the renaming result.
   string new_name(string orig_name);
 
-#ifdef DEBUG
   void dump();
-#endif
 
 protected:
   // A helper function assigns a new name to an existing variable name.
@@ -110,7 +108,7 @@ class fbjs::AbstractCompilerPass;
 
 class VariableRenaming : public fbjs::AbstractCompilerPass {
 public:
-  VariableRenaming(bool rename_globals);
+  VariableRenaming();
   virtual ~VariableRenaming();
 
   // Overrides Compiler::Pass::process
