@@ -19,7 +19,12 @@
 */
 %{
   #include <string.h>
+  #ifdef NOT_FBMAKE
   #include "parser.hpp"
+  #else
+  // Work around fbconfig/fbmake issue. See parser.ll for explanation
+  #include "libfbjs/parser.hpp"
+  #endif
 %}
 
 %union {

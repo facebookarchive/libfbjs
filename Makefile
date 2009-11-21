@@ -16,7 +16,7 @@
 # 
 # @author Marcel Laverdet
 
-CPPFLAGS=-fPIC -Wall
+CPPFLAGS=-fPIC -Wall -DNOT_FBMAKE=1
 
 ifdef OPT
   CPPFLAGS += -O2
@@ -29,12 +29,12 @@ all: libfbjs.so
 install:
 	cp libfbjs.so /usr/lib64/libfbjs.so
 
-parser.lex.cpp: parser.l
-	flex -o$@ -d $<
+parser.lex.cpp: parser.ll
+	flex -o $@ -d $<
 
 parser.lex.hpp: parser.lex.cpp
 
-parser.yacc.cpp: parser.y
+parser.yacc.cpp: parser.yy
 	bison --debug --verbose -d -o $@ $<
 
 parser.yacc.hpp: parser.yacc.cpp
@@ -60,30 +60,13 @@ libfbjs.a: parser.yacc.o parser.lex.o parser.o node.o dmg_fp_dtoa.o dmg_fp_g_fmt
 	$(AR) rc $@ $^
 	$(AR) -s $@
 
-libfbjs.so: libfbjs.a fbjs.o
+libfbjs.so: libfbjs.a
 	$(CC) -fPIC -shared $^ -o $@
 
-fbjs: cli.cpp fbjs.cpp libfbjs.a
-	$(CXX) -ggdb -Wall $^ -o $@
-
-troy: troy.cpp libfbjs.a
-	$(CXX) -ggdb -Wall $^ -o $@
-
-jsintlparse: jsintlparse.cpp libfbjs.a
-	$(CXX) -ggdb -Wall $^ -o $@
-
-jsbeautify: jsbeautify.cpp libfbjs.a
-	$(CXX) -ggdb -Wall $^ -o $@
-
-jsexports: jsexports.cpp libfbjs.a
-	$(CXX) -ggdb -Wall $^ -o $@
-
-jsxmin: jsxmin_main.cpp jsxmin_renaming.cpp jsxmin_reduction.cpp gflags/gflags.cc gflags/gflags_reporting.cc libfbjs.a
-	$(CXX) $(CPPFLAGS) -Wall -I. $^ -o $@ -lpthread
 
 clean:
-	$(RM) -f fbjs troy jsbeautify jsexports \
+	$(RM) -f \
     parser.lex.cpp parser.yacc.cpp parser.yacc.hpp parser.yacc.output \
     libfbjs.so libfbjs.a \
     dmg_fp_dtoa.o dmg_fp_g_fmt.o \
-    parser.lex.o parser.yacc.o parser.o node.o fbjs.o
+    parser.lex.o parser.yacc.o parser.o node.o

@@ -190,7 +190,7 @@ rope_t Node::renderBlock(bool must, render_guts_t* guts, int indentation) const 
 rope_t Node::renderIndentedStatement(render_guts_t* guts, int indentation) const {
   if (guts->pretty || guts->sanelineno) {
     rope_t ret;
-    bool newline;
+    bool newline = false;
     if (guts->sanelineno) {
       newline = this->renderLinenoCatchup(guts, ret);
     } else {

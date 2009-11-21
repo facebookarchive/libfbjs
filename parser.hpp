@@ -30,7 +30,13 @@
 #define YY_USER_INIT yylloc->first_line = 1
 
 #include "node.hpp"
+
+#ifdef NOT_FBMAKE
 #include "parser.yacc.hpp"
+#else
+// Work around fbmake issue, see parser.ll for explanation.
+#include "libfbjs/parser.yy.h"
+#endif
 struct fbjs_parse_extra {
   std::list<std::string> errors;
   std::stack<int> paren_stack;

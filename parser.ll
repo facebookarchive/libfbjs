@@ -20,7 +20,21 @@
 %{
 #include <stdio.h>
 #include <string.h>
+
+#ifdef NOT_FBMAKE
 #include "parser.hpp"
+#else
+/**
+ * This is a temporary workaround a drawback of fbconfig/fbmake.
+ * Fbmake does not include the source directory in the include path
+ * when compiling generated files. preprocessor_flags confuses
+ * fbconfig dealing with .ll and .yy files.
+ * Another workaround without the following change is:
+ *   fbmake dbg CXX_FLAGS=-I./libfbjs
+ */
+#include "libfbjs/parser.hpp"
+#endif
+
 using namespace fbjs;
 
 #ifdef DEBUG_FLEX

@@ -1,5 +1,0 @@
-This is a copy of gflags source files from fbcode/external/gflags.
-It is released under BSD license.
-
-Currently jsxmin lives in libfbjs directory, and it is independent of
-the reset of the fbcode base.
