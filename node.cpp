@@ -879,6 +879,21 @@ bool NodeUnary::operator== (const Node &that) const {
   return Node::operator==(that) && this->op == static_cast<const NodeUnary*>(&that)->op;
 }
 
+Node* NodeUnary::reduce() {
+  if (this->op == NOT_UNARY) {
+    NodeExpression* exp = dynamic_cast<NodeExpression*>(this->childNodes().front());
+    if (exp != NULL && exp->compare(true)) {
+      delete this;
+      return new NodeBooleanLiteral(false);
+    }
+    if (exp != NULL && exp->compare(false)) {
+      delete this;
+      return new NodeBooleanLiteral(true);
+    } 
+  }
+  return this;
+}
+
 //
 // NodePostfix
 NodePostfix::NodePostfix(node_postfix_t op, const unsigned int lineno /* = 0 */) : NodeExpression(lineno), op(op) {}
@@ -1072,27 +1087,78 @@ rope_t NodeIf::render(render_guts_t* guts, int indentation) const {
 
 Node* NodeIf::reduce() {
   Node::reduce();
-  NodeExpression* expression = (NodeExpression*)this->_childNodes.front();
-  bool evaluation = expression->compare(true);
-  if (!evaluation) {
-    evaluation = expression->compare(false);
-    if (!evaluation) {
-      return this;
+
+  // if (true / false) { ... } else { ... } -> ... 
+  {
+    node_list_t::iterator it = this->_childNodes.begin();
+    NodeExpression* expression = static_cast<NodeExpression*>(*it);
+    ++it;
+    if (expression->compare(true)) {
+      // take the ifBlock
+      Node* ifBlock = this->removeChild(it);
+      delete this;
+      return ifBlock;
+
+    } else if (expression->compare(false)) {
+      // take the else branch
+      ++it;
+      Node* elseBlock = *it;
+      if (elseBlock == NULL) {
+        delete this;
+        return NULL;
+      } else {
+        elseBlock = this->removeChild(it);
+        delete this;
+        return elseBlock;
+      }
     }
-    evaluation = false;
   }
-  node_list_t::iterator block = ++this->_childNodes.begin();
-  if (!evaluation) {
-    ++block;
+
+  // remove empty blocks
+  {
+    // Remove empty blocks. Empty blocks are most likely result of other
+    // code optimizations, e.g. 'bagofholding()'. 
+    node_list_t::iterator it = this->_childNodes.begin();
+    NodeExpression* expression = static_cast<NodeExpression*>(*it);
+    Node* ifBlock = *++it;
+    Node* elseBlock = *++it;
+
+    // If the else part is empty, it's safe to remove the else part.
+    //   if (cond) { ... } else { }  -> if (cond) { ... }
+    if (elseBlock != NULL && elseBlock->childNodes().empty()) {
+      this->replaceChild(NULL, it);  // *it == elseblock
+      delete elseBlock;
+      elseBlock = NULL;
+    }
+
+    // If both pathes are empty, replace it by the cond expression;
+    //   if (cond) { } else { } -> cond;
+    if (ifBlock->childNodes().empty() &&
+        elseBlock == NULL) {
+      Node* cond = this->removeChild(this->_childNodes.begin());
+      delete this;
+      return cond;
+    }
+
+    // If the ifBlock is empty, negate the condition, then reduce it.
+    //   if (cond) {} else { ... } -> if (!(cond)) { ... }
+    if (ifBlock->childNodes().empty() && elseBlock != NULL) {
+      // replace condition expression by !cond
+      int lineno = expression->lineno();
+      Node* new_cond = (new NodeUnary(NOT_UNARY, lineno))
+                       ->appendChild((new NodeParenthetical(lineno))
+                                     ->appendChild(expression));
+      node_list_t::iterator it_2 = this->childNodes().begin();
+      this->replaceChild(new_cond->reduce(), it_2);
+      // repalce empty ifBlock by elseBlock and remove elseBlock
+      this->replaceChild(elseBlock, ++it_2);
+      this->replaceChild(NULL, ++it_2);
+
+      delete ifBlock;
+    }
   }
-  if (*block == NULL) {
-    delete this;
-    return NULL;
-  } else {
-    Node* tmp = this->removeChild(block);
-    delete this;
-    return tmp;
-  }
+
+  return this;
 }
 
 //

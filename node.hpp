@@ -273,6 +273,7 @@ namespace fbjs {
       NodeUnary(node_unary_t op, const unsigned int lineno = 0);
       virtual Node* clone(Node* node = NULL) const;
       virtual rope_t render(render_guts_t* guts, int indentation) const;
+      virtual Node* reduce();
       const node_unary_t operatorType() const;
       virtual bool operator== (const Node&) const;
   };
