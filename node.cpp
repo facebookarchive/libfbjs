@@ -39,13 +39,14 @@ static bool is_reserved_keyword(string id) {
       "switch", "this", "throw", "try", "typeof", "var", "void", "while",
       "with",
       // Future reserved words
-      //   Our code does not respect future reserved keywords anyway.
-      //
-      // "abstract", "boolean", "byte", "char", "class", "const", "debugger",
-      // "double, "enum", "export", "extends", "final", "float", "goto",
-      // "implements", "import", "int", "interface", "long", "native",
-      // "package", "private", "protected", "public", "short", "static",
-      // "super", "synchronized", "throws", "transient", "volatile",
+      //   Our code does not respect future reserved keywords.
+      // Safari is picky about this. Don't consider them as identifiers
+      // for optimizations.
+      "abstract", "boolean", "byte", "char", "class", "const", "debugger",
+      "double", "enum", "export", "extends", "final", "float", "goto",
+      "implements", "import", "int", "interface", "long", "native",
+      "package", "private", "protected", "public", "short", "static",
+      "super", "synchronized", "throws", "transient", "volatile",
       //
       // NullLiteral and BooleanLiteral
       "true", "false", "null",
