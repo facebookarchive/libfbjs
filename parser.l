@@ -1,0 +1,336 @@
+%{
+#include <stdio.h>
+#include <string.h>
+#include "parser.hpp"
+using namespace fbjs;
+
+#ifdef DEBUG_FLEX
+#define FBJSBEGIN(a) if(a!=YY_START)printf("BEGIN(%d)\n", a); BEGIN(a)
+#else
+#define FBJSBEGIN(a) BEGIN(a)
+#endif
+
+#define parsertok(a) parsertok_(yyg, a);
+#define NEVERMIND \
+  for (int l = strlen(yytext) - 1; l >= 0; --l) { \
+    unput(yytext[l]); \
+  }
+
+int parsertok_(void*, int);
+%}
+
+%option noyywrap
+%option reentrant
+%option bison-bridge
+%option bison-locations
+
+%s IDENTIFIER
+%x DOT
+%x VIRTUAL_SEMICOLON
+%s NO_LINEBREAK
+FBJSBEGIN(IDENTIFIER);
+
+%%
+<NO_LINEBREAK>{
+  [\n\r] {
+    yylloc->first_line++;
+    BEGIN(IDENTIFIER);
+    return t_VIRTUAL_SEMICOLON;
+  }
+  . {
+    BEGIN(IDENTIFIER);
+    NEVERMIND;
+  }
+}
+<*>{
+  "//".*    |
+  "<!--".*  |
+  [ \t\x0b\x0c\xa0]+  /* om nom nom */
+  "/*" {
+    char c;
+    bool newline = false;
+    for (;;) {
+      while ((c = yyinput(yyscanner)) != '*' && c != EOF) {
+        if (c == '\n' || c == '\r') {
+          yylloc->first_line++;
+          newline = true;
+        }
+      }
+      if (c == '*') {
+        while ((c = yyinput(yyscanner)) == '*');
+        if (c == '/') {
+          break;
+        }
+      }
+      if (c == EOF) {
+        return 0;
+        break;
+      }
+    }
+    if (newline) {
+      yylloc->first_line--;
+      unput('\n');
+    }
+  }
+}
+<VIRTUAL_SEMICOLON>{
+  "catch" {
+    return parsertok(t_CATCH);
+  }
+  "else" {
+    if (yyextra->last_tok != t_RCURLY && yyextra->last_tok != t_SEMICOLON) {
+      NEVERMIND;
+      FBJSBEGIN(INITIAL);
+      return t_VIRTUAL_SEMICOLON;
+    } else {
+      return parsertok(t_ELSE);
+    }
+  }
+  "while" {
+    if ((yyextra->last_tok != t_RCURLY || yyextra->last_curly_tok != t_DO) && yyextra->last_tok != t_SEMICOLON) {
+      NEVERMIND;
+      FBJSBEGIN(INITIAL);
+      return t_VIRTUAL_SEMICOLON;
+    } else {
+      return parsertok(t_WHILE);
+    }
+  }
+  "finally" {
+    return parsertok(t_FINALLY);
+  }
+  "in" {
+    return parsertok(t_IN);
+  }
+  [a-zA-Z$_0-9]+ {
+    NEVERMIND;
+    if (yyextra->last_tok == t_RPAREN &&
+        (yyextra->last_paren_tok == t_IF || yyextra->last_paren_tok == t_DO || yyextra->last_paren_tok == t_FOR)) {
+      FBJSBEGIN(INITIAL);
+    } else {
+      FBJSBEGIN(INITIAL);
+      return t_VIRTUAL_SEMICOLON;
+    }
+  }
+  [\n\r] {
+    yylloc->first_line++;
+  }
+  . {
+    FBJSBEGIN(yyextra->virtual_semicolon_last_state);
+    unput(yytext[0]);
+  }
+}
+<INITIAL,IDENTIFIER>{
+  "break"  return parsertok(t_BREAK);
+  "case"  return parsertok(t_CASE);
+  "catch"  return parsertok(t_CATCH);
+  "continue"  return parsertok(t_CONTINUE);
+  "default"  return parsertok(t_DEFAULT);
+  "delete"  return parsertok(t_DELETE);
+  "do"  return parsertok(t_DO);
+  "else"  return parsertok(t_ELSE);
+  "finally"  return parsertok(t_FINALLY);
+  "for"  return parsertok(t_FOR);
+  "function" {
+    // This is a hack to get this working in Bison. ExpressionStatements may not begin with t_FUNCTION
+    if (yyextra->last_tok != t_LCURLY && yyextra->last_tok != t_RCURLY && yyextra->last_tok != t_RPAREN &&
+        yyextra->last_tok != t_ELSE && yyextra->last_tok != t_FUNCTION_HACK && yyextra->last_tok != t_SEMICOLON &&
+        yyextra->last_tok != t_VIRTUAL_SEMICOLON && yyextra->last_tok != 0) {
+      NEVERMIND;
+      return parsertok(t_FUNCTION_HACK);
+    }
+    return parsertok(t_FUNCTION);
+  }
+  "if"  return parsertok(t_IF);
+  "in"  return parsertok(t_IN);
+  "instanceof"  return parsertok(t_INSTANCEOF);
+  "new"  return parsertok(t_NEW);
+  "return"  return parsertok(t_RETURN);
+  "switch"  return parsertok(t_SWITCH);
+  "this"  return parsertok(t_THIS);
+  "throw"  return parsertok(t_THROW);
+  "try"  return parsertok(t_TRY);
+  "typeof"  return parsertok(t_TYPEOF);
+  "var"  return parsertok(t_VAR);
+  "void"  return parsertok(t_VOID);
+  "while"  return parsertok(t_WHILE);
+  "with"  return parsertok(t_WITH);
+  "const" return parsertok(t_CONST);
+  "null"  return parsertok(t_NULL);
+  "false"  return parsertok(t_FALSE);
+  "true"  return parsertok(t_TRUE);
+}
+0x[a-fA-F0-9]+ {
+  unsigned int val;
+  sscanf(yytext, "%x", &val);
+  yylval->number = (double)val;
+  return parsertok(t_NUMBER);
+}
+0[0-7]+ {
+  // TODO: octal
+}
+[0-9]*\.?[0-9]+[eE]-?[0-9]{1,3}  {
+  // TODO: exponent notation
+}
+[0-9]+ {
+  yylval->number = atof(yytext);
+  return parsertok(t_NUMBER);
+}
+[0-9]*\.[0-9]+ {
+  yylval->number = atof(yytext);
+  return parsertok(t_NUMBER);
+}
+<INITIAL,IDENTIFIER,DOT>[a-zA-Z$_][a-zA-Z$_0-9]* {
+  yylval->string = strdup(yytext);
+  return parsertok(t_IDENTIFIER);
+}
+'(\\.|\\[\n\r]|[^'])*'  |
+\"(\\.|\\[\n\r]|[^\"])*\" {
+  /* TODO: check for line continuation
+     var a = 'test \
+     wat ';
+  */
+  yylval->string = strdup(yytext);
+  return parsertok(t_STRING);
+}
+<IDENTIFIER>\/[^*\/](\[([^\]\\]+|\\.)+\]|\\.|[^\/])*\/[A-Za-z]* {
+  yylval->string = strdup(yytext);
+  return parsertok(t_REGEX);
+}
+"{" {
+  // More fun hackiness to get this working in Bison
+  // Blocks are only valid after t_LCURLY t_RCURLY t_RPAREN t_TRY t_CATCH t_FINALLY, and luckily there
+  // and no cases where an object literal would be allowed there.
+  if (yyextra->last_tok != t_LCURLY && yyextra->last_tok != t_RCURLY && yyextra->last_tok != t_RPAREN &&
+      yyextra->last_tok != t_TRY && yyextra->last_tok != t_CATCH && yyextra->last_tok != t_FINALLY &&
+      yyextra->last_tok != t_ELSE && yyextra->last_tok != t_DO && yyextra->last_tok != t_SEMICOLON &&
+      yyextra->last_tok != t_VIRTUAL_SEMICOLON && yyextra->last_tok != 0 && yyextra->last_tok != t_OBJECT_LITERAL_HACK) {
+    NEVERMIND;
+    return parsertok(t_OBJECT_LITERAL_HACK);
+  }
+  yyextra->curly_stack.push(yyextra->last_tok);
+  return parsertok(t_LCURLY);
+}
+"}" {
+  if (yyextra->last_tok != t_LCURLY && yyextra->last_tok != t_SEMICOLON && yyextra->last_tok != t_VIRTUAL_SEMICOLON) {
+    NEVERMIND;
+    return parsertok(t_VIRTUAL_SEMICOLON);
+  }
+  yyextra->last_curly_tok = yyextra->curly_stack.top();
+  yyextra->curly_stack.pop();
+  return parsertok(t_RCURLY);
+}
+"(" {
+  yyextra->paren_stack.push(yyextra->last_tok);
+  return parsertok(t_LPAREN);
+}
+")" {
+  if (!yyextra->paren_stack.empty()) { // otherwise, whatever, it's a syntax error anyway...
+    yyextra->last_paren_tok = yyextra->paren_stack.top();
+    yyextra->paren_stack.pop();
+  }
+  return parsertok(t_RPAREN);
+}
+"["    return parsertok(t_LBRACKET);
+"]"    return parsertok(t_RBRACKET);
+"."    return parsertok(t_PERIOD);
+";"    return parsertok(t_SEMICOLON);
+","    return parsertok(t_COMMA);
+":"    return parsertok(t_COLON);
+"?"    return parsertok(t_PLING);
+"&&"   return parsertok(t_AND);
+"||"   return parsertok(t_OR);
+"==="  return parsertok(t_STRICT_EQUAL);
+"!=="  return parsertok(t_STRICT_NOT_EQUAL);
+"<="   return parsertok(t_LESS_THAN_EQUAL);
+">="   return parsertok(t_GREATER_THAN_EQUAL);
+"=="   return parsertok(t_EQUAL);
+"!="   return parsertok(t_NOT_EQUAL);
+"++"   return parsertok(t_INCR);
+"--"   return parsertok(t_DECR);
+"<<="  return parsertok(t_LSHIFT_ASSIGN);
+"<<"   return parsertok(t_LSHIFT);
+">>="  return parsertok(t_RSHIFT_ASSIGN);
+">>>=" return parsertok(t_RSHIFT3_ASSIGN);
+">>>"  return parsertok(t_RSHIFT3);
+">>"   return parsertok(t_RSHIFT);
+"+="   return parsertok(t_PLUS_ASSIGN);
+"-="   return parsertok(t_MINUS_ASSIGN);
+"/="   return parsertok(t_DIV_ASSIGN);
+"*="   return parsertok(t_MULT_ASSIGN);
+"%="   return parsertok(t_MOD_ASSIGN);
+"&="   return parsertok(t_BIT_AND_ASSIGN);
+"|="   return parsertok(t_BIT_OR_ASSIGN);
+"^="   return parsertok(t_BIT_XOR_ASSIGN);
+"<"    return parsertok(t_LESS_THAN);
+">"    return parsertok(t_GREATER_THAN);
+"+"    return parsertok(t_PLUS);
+"-"    return parsertok(t_MINUS);
+"*"    return parsertok(t_MULT);
+"/"    return parsertok(t_DIV);
+"%"    return parsertok(t_MOD);
+"|"    return parsertok(t_BIT_OR);
+"&"    return parsertok(t_BIT_AND);
+"^"    return parsertok(t_BIT_XOR);
+"!"    return parsertok(t_NOT);
+"~"    return parsertok(t_BIT_NOT);
+"="    return parsertok(t_ASSIGN);
+[\n\r] {
+  yylloc->first_line++;
+  if (yyextra->last_tok == t_IDENTIFIER || yyextra->last_tok == t_NUMBER || yyextra->last_tok == t_STRING ||
+    yyextra->last_tok == t_REGEX || yyextra->last_tok == t_TRUE || yyextra->last_tok == t_FALSE ||
+    yyextra->last_tok == t_RPAREN || yyextra->last_tok == t_RCURLY || yyextra->last_tok == t_RBRACKET ||
+    yyextra->last_tok == t_NULL) {
+    yyextra->virtual_semicolon_last_state = YY_START;
+    FBJSBEGIN(VIRTUAL_SEMICOLON);
+    // Not to spec... sec 7.9.1
+  }
+}
+<<EOF>> {
+  if (yyextra->last_tok != t_VIRTUAL_SEMICOLON && yyextra->last_tok != t_SEMICOLON) {
+    return parsertok(t_VIRTUAL_SEMICOLON);
+  } else {
+    return 0;
+  }
+}
+. {
+  // Syntax error!
+  return yytext[0];
+}
+%%
+
+int parsertok_(void* guts, int tok) {
+  yyguts_t *yyg = (struct yyguts_t*)guts;
+  switch (tok) {
+    case t_IDENTIFIER:
+    case t_NUMBER:
+    case t_STRING:
+    case t_REGEX:
+    case t_INCR:
+    case t_DECR:
+    case t_RBRACKET:
+    case t_RPAREN:
+    case t_FALSE:
+    case t_NULL:
+    case t_THIS:
+    case t_TRUE:
+      FBJSBEGIN(INITIAL);
+      break;
+    case t_CONTINUE:
+    case t_BREAK:
+    case t_RETURN:
+    case t_THROW:
+      FBJSBEGIN(NO_LINEBREAK);
+      break;
+    case t_PERIOD:
+      FBJSBEGIN(DOT);
+      break;
+    default:
+      FBJSBEGIN(IDENTIFIER);
+      break;
+  }
+  yyextra->last_tok = tok;
+#ifdef DEBUG_FLEX
+  printf("--> %d\n", tok);
+#endif
+  return tok;
+}
