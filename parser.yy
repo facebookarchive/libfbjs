@@ -48,6 +48,10 @@
       break; \
     }
 
+  void fbjs_push_xml_state(void* guts);
+  void fbjs_push_xml_embedded_expression_state(void* guts);
+  void fbjs_pop_xml_state(void* guts);
+
   void terminate(void* yyscanner, const char* str) {
     fbjs_parse_extra* extra = yyget_extra(yyscanner);
     if (!extra->terminated) {
@@ -76,9 +80,10 @@
 %token t_LPAREN t_RPAREN
 %token t_LBRACKET t_RBRACKET
 %token t_SEMICOLON t_VIRTUAL_SEMICOLON
-%token t_BREAK t_CASE t_CATCH t_CONTINUE t_DEFAULT t_DO t_FINALLY t_FOR
+%token t_BREAK t_CASE t_CATCH t_CONTINUE t_DEFAULT t_DO t_FINALLY t_FOR t_FOR_EACH
 %token t_FUNCTION t_IF t_IN t_INSTANCEOF t_RETURN t_SWITCH t_THIS t_THROW t_TRY
 %token t_VAR t_WHILE t_WITH t_CONST t_NULL t_FALSE t_TRUE
+%token t_XML_QUOTE t_XML_APOS t_XML_LT_DIV t_XML_DEFAULT_NAMESPACE
 
 // Special if \ else associativity
 %nonassoc p_IF
@@ -88,6 +93,7 @@
 %token<number> t_NUMBER
 %token<string> t_IDENTIFIER t_STRING
 %token<string_duple> t_REGEX
+%token<string> t_XML_NAME_FRAGMENT t_XML_CDATA t_XML_WHITESPACE t_XML_COMMENT t_XML_PI
 
 // Operators + associativity
 %token t_COMMA
@@ -105,7 +111,8 @@
 %left t_DIV t_MULT t_MOD
 %right t_NOT t_BIT_NOT t_INCR t_DECR t_DELETE t_TYPEOF t_VOID
 %nonassoc p_POSTFIX
-%token t_NEW t_PERIOD
+%left t_XML_ATTRIBUTE
+%token t_NEW t_PERIOD t_XML_DESCENDENT t_XML_QUALIFIER
 
 // Literals
 %type<node> null_literal boolean_literal numeric_literal regex_literal string_literal array_literal element_list object_literal property_name property_name_and_value_list
@@ -132,6 +139,16 @@
 
 // Functions
 %type<node> function_expression function_declaration formal_parameter_list function_body
+
+// E4X / XML
+%type<node> xml_literal
+%type<node> xml_element xml_element_content xml_element_content_tag
+%type<node> xml_tag_content xml_name xml_tag_name
+%type<node> xml_attribute_list_opt xml_attribute_list xml_attribute_value
+%type<node> xml_cdata_no_quote xml_cdata_no_apos xml_cdata_xml_content
+%type<string> xml_cdata_fragment xml_cdata_fragment_attr
+%type<node> xml_embedded_expression
+%type<node> property_identifier attribute_identifier property_selector qualified_identifier wildcard_identifier
 
 // Errors
 %token t_UNTERMINATED_REGEX_LITERAL
@@ -971,6 +988,14 @@ iteration_statement:
 |   t_FOR t_LPAREN t_VAR variable_declaration_list_no_in t_IN expression t_RPAREN statement {
       $$ = (new NodeForIn($4->lineno()))->appendChild(static_cast<NodeVarDeclaration*>($4)->setIterator(true))->appendChild($6)->appendChild($8);
     }
+|   t_FOR_EACH t_LPAREN left_hand_side_expression t_IN expression t_RPAREN statement {
+      require_support(PARSE_E4X, "E4X not supported");
+      $$ = (new NodeForEachIn($3->lineno()))->appendChild($3)->appendChild($5)->appendChild($7);
+    }
+|   t_FOR_EACH t_LPAREN t_VAR variable_declaration_list_no_in t_IN expression t_RPAREN statement {
+      require_support(PARSE_E4X, "E4X not supported");
+      $$ = (new NodeForEachIn($4->lineno()))->appendChild(static_cast<NodeVarDeclaration*>($4)->setIterator(true))->appendChild($6)->appendChild($8);
+    }
 ;
 
 continue_statement:
@@ -1148,6 +1173,361 @@ function_body:
       $$ = new NodeStatementList(yylineno);
     }
 |   statement_list;
+;
+
+//
+// E4X XML literals
+primary_expression_no_statement:
+    xml_literal {
+      require_support(PARSE_E4X, "E4X not supported");
+      $$ = $1;
+    }
+;
+
+xml_literal:
+    xml_element
+|   xml_lt t_GREATER_THAN xml_element_content t_XML_LT_DIV t_GREATER_THAN {
+        fbjs_pop_xml_state(yyscanner);
+        $$ = (new NodeXMLElement(yylineno))
+          ->appendChild(NULL)->appendChild(NULL)->appendChild($3)->appendChild(NULL);
+    }
+;
+
+xml_element:
+    xml_tag_content t_DIV t_GREATER_THAN {
+      fbjs_pop_xml_state(yyscanner);
+      $$ = $1->appendChild(new NodeXMLContentList(yylineno))->appendChild(NULL);
+    }
+|   xml_tag_content t_GREATER_THAN xml_element_content t_XML_LT_DIV xml_tag_name xml_ws_opt t_GREATER_THAN {
+      fbjs_pop_xml_state(yyscanner);
+      $$ = $1->appendChild($3)->appendChild($5);
+    }
+;
+
+xml_tag_content:
+    xml_lt xml_tag_name xml_attribute_list_opt {
+      $$ = (new NodeXMLElement(yylineno))->appendChild($2)->appendChild($3);
+    }
+;
+
+xml_lt:
+    t_LESS_THAN {
+        fbjs_push_xml_state(yyscanner);
+    }
+;
+
+xml_name:
+    t_XML_NAME_FRAGMENT {
+      $$ = new NodeXMLName("", $1, yylineno);
+    }
+|   t_XML_NAME_FRAGMENT t_COLON t_XML_NAME_FRAGMENT {
+      $$ = new NodeXMLName($1, $3, yylineno);
+    }
+;
+
+xml_tag_name:
+    xml_name
+|   xml_embedded_expression
+;
+
+xml_element_content:
+    /* empty */ {
+      $$ = new NodeXMLContentList(yylineno);
+    }
+|   xml_cdata_xml_content {
+      $$ = (new NodeXMLContentList(yylineno))->appendChild($1);
+    }
+|   xml_element_content xml_element_content_tag xml_cdata_xml_content {
+      $$ = $1->appendChild($2)->appendChild($3);
+    }
+|   xml_element_content xml_element_content_tag {
+      $$ = $1->appendChild($2);
+    }
+;
+
+xml_element_content_tag:
+    xml_element
+|   xml_embedded_expression
+|   t_XML_COMMENT {
+      $$ = new NodeXMLComment($1, yylineno);
+      free($1);
+    }
+|   t_XML_PI {
+      $$ = new NodeXMLPI($1, yylineno);
+      free($1);
+    }
+;
+
+xml_attribute_list_opt:
+    /* empty */ {
+      $$ = new NodeXMLAttributeList(yylineno);
+    }
+|   xml_attribute_list
+;
+
+xml_attribute_list:
+    t_XML_WHITESPACE {
+      $$ = new NodeXMLAttributeList(yylineno);
+    }
+|   xml_attribute_list t_XML_WHITESPACE
+|   xml_attribute_list xml_name t_ASSIGN xml_attribute_value {
+      $$ = $1->appendChild((new NodeXMLAttribute(yylineno))->appendChild($2)->appendChild($4));
+    }
+;
+
+xml_attribute_value:
+    t_XML_APOS xml_cdata_no_apos t_XML_APOS {
+      $$ = $2;
+    }
+|   t_XML_QUOTE xml_cdata_no_quote t_XML_QUOTE {
+      $$ = $2;
+    }
+|   xml_embedded_expression {
+      $$ = $1;
+    }
+;
+
+xml_cdata_no_quote:
+    /* empty */ {
+      $$ = new NodeXMLTextData();
+    }
+|   xml_cdata_no_quote xml_cdata_fragment_attr {
+      $$ = $1;
+      static_cast<NodeXMLTextData*>($$)->appendData($2);
+      free($2);
+    }
+|   xml_cdata_no_quote t_XML_APOS {
+      $$ = $1;
+      static_cast<NodeXMLTextData*>($$)->appendData("'");
+    }
+;
+
+xml_cdata_no_apos:
+    /* empty */ {
+      $$ = new NodeXMLTextData();
+    }
+|   xml_cdata_no_apos xml_cdata_fragment_attr {
+      $$ = $1;
+      static_cast<NodeXMLTextData*>($$)->appendData($2);
+      free($2);
+    }
+|   xml_cdata_no_apos t_XML_QUOTE {
+      $$ = $1;
+      static_cast<NodeXMLTextData*>($$)->appendData("\"");
+    }
+;
+
+xml_cdata_xml_content:
+    xml_cdata_fragment {
+      $$ = new NodeXMLTextData(yylineno);
+      static_cast<NodeXMLTextData*>($$)->appendData($1);
+      free($1);
+    }
+|   t_XML_APOS {
+      $$ = new NodeXMLTextData(yylineno);
+      static_cast<NodeXMLTextData*>($$)->appendData("'");
+    }
+|   t_XML_QUOTE {
+      $$ = new NodeXMLTextData(yylineno);
+      static_cast<NodeXMLTextData*>($$)->appendData("\"");
+    }
+|   t_XML_WHITESPACE {
+      $$ = new NodeXMLTextData(yylineno);
+      static_cast<NodeXMLTextData*>($$)->appendData($1, true);
+      free($1);
+    }
+|   xml_cdata_xml_content xml_cdata_fragment {
+      $$ = $1;
+      static_cast<NodeXMLTextData*>($$)->appendData($2);
+      free($2);
+    }
+|   xml_cdata_xml_content t_XML_APOS {
+      $$ = $1;
+      static_cast<NodeXMLTextData*>($$)->appendData("'");
+    }
+|   xml_cdata_xml_content t_XML_QUOTE {
+      $$ = $1;
+      static_cast<NodeXMLTextData*>($$)->appendData("\"");
+    }
+|   xml_cdata_xml_content t_XML_WHITESPACE {
+      $$ = $1;
+      static_cast<NodeXMLTextData*>($$)->appendData($2, true);
+      free($2);
+    }
+;
+
+xml_cdata_fragment:
+/*  Does not include: t_LESS_THAN, t_XML_APOS, t_XML_QUOTE, t_LCURLY, t_XML_WHITESPACE */
+    t_XML_CDATA
+|   t_XML_NAME_FRAGMENT
+|   t_COLON {
+      $$ = strdup(":");
+    }
+|   t_ASSIGN {
+      $$ = strdup("=");
+    }
+|   t_RCURLY {
+      $$ = strdup("}");
+    }
+|   t_GREATER_THAN {
+      $$ = strdup(">");
+    }
+|   t_DIV {
+      $$ = strdup("/");
+    }
+;
+
+xml_cdata_fragment_attr:
+/*  Does not include: t_XML_APOS, t_XML_QUOTE */
+    xml_cdata_fragment
+|   t_LESS_THAN {
+      $$ = strdup("<");
+    }
+|   t_LCURLY {
+      $$ = strdup("{");
+    }
+|   t_XML_WHITESPACE
+;
+
+xml_embedded_expression:
+    t_LCURLY { fbjs_push_xml_embedded_expression_state(yyscanner); } expression t_VIRTUAL_SEMICOLON t_RCURLY {
+      fbjs_pop_xml_state(yyscanner);
+      $$ = (new NodeXMLEmbeddedExpression($3->lineno()))->appendChild($3);
+    }
+;
+
+xml_ws_opt:
+    /* empty */
+|   t_XML_WHITESPACE
+;
+
+//
+// E4X expressions
+statement:
+    t_XML_DEFAULT_NAMESPACE t_ASSIGN expression semicolon {
+      require_support(PARSE_E4X, "E4X not supported");
+      $$ = (new NodeXMLDefaultNamespace(yylineno))->appendChild($3);
+    }
+;
+primary_expression_no_statement:
+    property_identifier {
+      require_support(PARSE_E4X, "E4X not supported");
+      $$ = $1;
+    }
+;
+
+property_identifier:
+    attribute_identifier
+|   qualified_identifier
+|   wildcard_identifier
+;
+
+attribute_identifier:
+    t_XML_ATTRIBUTE property_selector {
+      $$ = (new NodeStaticAttributeIdentifier(yylineno))->appendChild($2);
+    }
+|   t_XML_ATTRIBUTE qualified_identifier {
+      $$ = (new NodeStaticAttributeIdentifier(yylineno))->appendChild($2);
+    }
+|   t_XML_ATTRIBUTE t_LBRACKET expression t_RBRACKET {
+      $$ = (new NodeDynamicAttributeIdentifier(yylineno))->appendChild($3);
+    }
+;
+
+property_selector:
+    identifier
+|   wildcard_identifier
+;
+
+qualified_identifier:
+    property_selector t_XML_QUALIFIER property_selector {
+      $$ = (new NodeStaticQualifiedIdentifier($1->lineno()))->appendChild($1)->appendChild($3);
+    }
+|   property_selector t_XML_QUALIFIER t_LBRACKET expression t_RBRACKET {
+      $$ = (new NodeDynamicQualifiedIdentifier($1->lineno()))->appendChild($1)->appendChild($4);
+    }
+;
+
+wildcard_identifier:
+    t_MULT {
+      $$ = new NodeWildcardIdentifier(yylineno);
+    }
+;
+
+member_expression:
+    member_expression t_PERIOD property_identifier {
+      require_support(PARSE_E4X, "E4X not supported");
+      $$ = (new NodeStaticMemberExpression(yylineno))->appendChild($1)->appendChild($3);
+    }
+|   member_expression t_PERIOD t_LPAREN expression t_RPAREN {
+      require_support(PARSE_E4X, "E4X not supported");
+      $$ = (new NodeFilteringPredicate(yylineno))->appendChild($1)->appendChild($4);
+    }
+|   member_expression t_XML_DESCENDENT identifier {
+      require_support(PARSE_E4X, "E4X not supported");
+      $$ = (new NodeDescendantExpression(yylineno))->appendChild($1)->appendChild($3);
+    }
+|   member_expression t_XML_DESCENDENT property_identifier {
+      require_support(PARSE_E4X, "E4X not supported");
+      $$ = (new NodeDescendantExpression(yylineno))->appendChild($1)->appendChild($3);
+    }
+;
+
+member_expression_no_statement:
+    member_expression_no_statement t_PERIOD property_identifier {
+      require_support(PARSE_E4X, "E4X not supported");
+      $$ = (new NodeStaticMemberExpression(yylineno))->appendChild($1)->appendChild($3);
+    }
+|   member_expression_no_statement t_PERIOD t_LPAREN expression t_RPAREN {
+      require_support(PARSE_E4X, "E4X not supported");
+      $$ = (new NodeFilteringPredicate(yylineno))->appendChild($1)->appendChild($4);
+    }
+|   member_expression_no_statement t_XML_DESCENDENT identifier {
+      require_support(PARSE_E4X, "E4X not supported");
+      $$ = (new NodeDescendantExpression(yylineno))->appendChild($1)->appendChild($3);
+    }
+|   member_expression_no_statement t_XML_DESCENDENT property_identifier {
+      require_support(PARSE_E4X, "E4X not supported");
+      $$ = (new NodeDescendantExpression(yylineno))->appendChild($1)->appendChild($3);
+    }
+;
+
+call_expression:
+    call_expression t_PERIOD property_identifier {
+      require_support(PARSE_E4X, "E4X not supported");
+      $$ = (new NodeStaticMemberExpression(yylineno))->appendChild($1)->appendChild($3);
+    }
+|   call_expression t_PERIOD t_LPAREN expression t_RPAREN {
+      require_support(PARSE_E4X, "E4X not supported");
+      $$ = (new NodeFilteringPredicate(yylineno))->appendChild($1)->appendChild($4);
+    }
+|   call_expression t_XML_DESCENDENT identifier {
+      require_support(PARSE_E4X, "E4X not supported");
+      $$ = (new NodeDescendantExpression(yylineno))->appendChild($1)->appendChild($3);
+    }
+|   call_expression t_XML_DESCENDENT property_identifier {
+      require_support(PARSE_E4X, "E4X not supported");
+      $$ = (new NodeDescendantExpression(yylineno))->appendChild($1)->appendChild($3);
+    }
+;
+
+call_expression_no_statement:
+    call_expression_no_statement t_PERIOD property_identifier {
+      require_support(PARSE_E4X, "E4X not supported");
+      $$ = (new NodeStaticMemberExpression(yylineno))->appendChild($1)->appendChild($3);
+    }
+|   call_expression_no_statement t_PERIOD t_LPAREN expression t_RPAREN {
+      require_support(PARSE_E4X, "E4X not supported");
+      $$ = (new NodeFilteringPredicate(yylineno))->appendChild($1)->appendChild($4);
+    }
+|   call_expression_no_statement t_XML_DESCENDENT identifier {
+      require_support(PARSE_E4X, "E4X not supported");
+      $$ = (new NodeDescendantExpression(yylineno))->appendChild($1)->appendChild($3);
+    }
+|   call_expression_no_statement t_XML_DESCENDENT property_identifier {
+      require_support(PARSE_E4X, "E4X not supported");
+      $$ = (new NodeDescendantExpression(yylineno))->appendChild($1)->appendChild($3);
+    }
 ;
 
 %%

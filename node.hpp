@@ -42,6 +42,7 @@ namespace fbjs {
     PARSE_NONE = 0,
     PARSE_TYPEHINT = 1,
     PARSE_OBJECT_LITERAL_ELISON = 2,
+    PARSE_E4X = 4,
   };
   struct render_guts_t {
     unsigned int lineno;
@@ -577,6 +578,16 @@ namespace fbjs {
   };
 
   //
+  // NodeForEachIn
+  class NodeForEachIn: public Node {
+    public:
+      NODE_WALKER_ACCEPT_DECL;
+      NodeForEachIn(const unsigned int lineno = 0);
+      virtual Node* clone(Node* node = NULL) const;
+      virtual rope_t render(render_guts_t* guts, int indentation) const;
+  };
+
+  //
   // NodeWhile
   class NodeWhile: public Node {
     public:
@@ -592,6 +603,219 @@ namespace fbjs {
     public:
       NODE_WALKER_ACCEPT_DECL;
       NodeDoWhile(const unsigned int lineno = 0);
+      virtual Node* clone(Node* node = NULL) const;
+      virtual rope_t render(render_guts_t* guts, int indentation) const;
+  };
+
+  //
+  // NodeXMLDefaultNamespace
+  // children: NodeExpression
+  class NodeXMLDefaultNamespace: public NodeStatement {
+    public:
+      NODE_WALKER_ACCEPT_DECL;
+      NodeXMLDefaultNamespace(const unsigned int lineno = 0);
+      virtual Node* clone(Node* node = NULL) const;
+      virtual rope_t render(render_guts_t* guts, int indentation) const;
+  };
+
+  //
+  // NodeXMLName
+  // children: none
+  class NodeXMLName: public Node {
+    protected:
+      const std::string _ns;
+      const std::string _name;
+    public:
+      NODE_WALKER_ACCEPT_DECL;
+      NodeXMLName(const std::string &ns, const std::string &name, const unsigned int lineno = 0);
+      virtual Node* clone(Node* node = NULL) const;
+      virtual rope_t render(render_guts_t* guts, int indentation) const;
+      virtual const std::string ns() const;
+      virtual const std::string name() const;
+  };
+
+  //
+  // NodeXMLElement
+  // children:
+  //   NodeXMLName | NodeXMLEmbeddedExpression | NULL,
+  //   NodeXMLAttributeList,
+  //   NodeXMLContentList,
+  //   NodeXMLName | NodeXMLEmbeddedExpression | NULL
+  class NodeXMLElement: public NodeExpression {
+    public:
+      NODE_WALKER_ACCEPT_DECL;
+      NodeXMLElement(const unsigned int lineno = 0);
+      virtual Node* clone(Node* node = NULL) const;
+      virtual rope_t render(render_guts_t* guts, int indentation) const;
+  };
+
+  //
+  // NodeXMLComment
+  // children: none
+  class NodeXMLComment: public Node {
+    protected:
+      const std::string _comment;
+    public:
+      NODE_WALKER_ACCEPT_DECL;
+      NodeXMLComment(const std::string &comment, const unsigned int lineno = 0);
+      virtual Node* clone(Node* node = NULL) const;
+      virtual rope_t render(render_guts_t* guts, int indentation) const;
+      virtual const std::string comment() const;
+  };
+
+  //
+  // NodeXMLPI
+  // children: none
+  class NodeXMLPI: public Node {
+    protected:
+      const std::string _data;
+    public:
+      NODE_WALKER_ACCEPT_DECL;
+      NodeXMLPI(const std::string &data, const unsigned int lineno = 0);
+      virtual Node* clone(Node* node = NULL) const;
+      virtual rope_t render(render_guts_t* guts, int indentation) const;
+      virtual const std::string data() const;
+  };
+
+  //
+  // NodeXMLContentList
+  // children: NodeXMLElement*
+  class NodeXMLContentList: public Node {
+    public:
+      NODE_WALKER_ACCEPT_DECL;
+      NodeXMLContentList(const unsigned int lineno = 0);
+      virtual Node* clone(Node* node = NULL) const;
+      virtual rope_t render(render_guts_t* guts, int indentation) const;
+  };
+
+  //
+  // NodeXMLTextData
+  // children: none
+  class NodeXMLTextData: public Node {
+    protected:
+      rope_t _data;
+      bool whitespace;
+    public:
+      NODE_WALKER_ACCEPT_DECL;
+      NodeXMLTextData(const unsigned int lineno = 0);
+      virtual Node* clone(Node* node = NULL) const;
+      virtual rope_t render(render_guts_t* guts, int indentation) const;
+      virtual void appendData(rope_t str, bool isWhitespace = false);
+      virtual bool isWhitespace() const;
+      const char* data() const;
+  };
+
+  //
+  // NodeXMLEmbeddedExpression
+  // children: NodeExpression
+  class NodeXMLEmbeddedExpression: public Node {
+    public:
+      NODE_WALKER_ACCEPT_DECL;
+      NodeXMLEmbeddedExpression(const unsigned int lineno = 0);
+      virtual Node* clone(Node* node = NULL) const;
+      virtual rope_t render(render_guts_t* guts, int indentation) const;
+  };
+
+  //
+  // NodeXMLAttributeList
+  // children: NodeXMLAttribute*
+  class NodeXMLAttributeList: public Node {
+    public:
+      NODE_WALKER_ACCEPT_DECL;
+      NodeXMLAttributeList(const unsigned int lineno = 0);
+      virtual Node* clone(Node* node = NULL) const;
+      virtual rope_t render(render_guts_t* guts, int indentation) const;
+  };
+
+  //
+  // NodeXMLAttribute
+  // children: NodeXMLName, NodeXMLTextData | NodeExpression
+  class NodeXMLAttribute: public Node {
+    public:
+      NODE_WALKER_ACCEPT_DECL;
+      NodeXMLAttribute(const unsigned int lineno = 0);
+      virtual Node* clone(Node* node = NULL) const;
+      virtual rope_t render(render_guts_t* guts, int indentation) const;
+  };
+
+  //
+  // NodeWildcardIdentifier
+  // children: none
+  class NodeWildcardIdentifier: public NodeExpression {
+    public:
+      NODE_WALKER_ACCEPT_DECL;
+      NodeWildcardIdentifier(const unsigned int lineno = 0);
+      virtual Node* clone(Node* node = NULL) const;
+      virtual rope_t render(render_guts_t* guts, int indentation) const;
+      virtual bool isValidlVal() const;
+  };
+
+  //
+  // NodeStaticAttributeIdentifier
+  // children: NodeIdentifier | NodeWildcardIdentifier | NodeStaticQualifiedIdentifier
+  class NodeStaticAttributeIdentifier: public NodeExpression {
+    public:
+      NODE_WALKER_ACCEPT_DECL;
+      NodeStaticAttributeIdentifier(const unsigned int lineno = 0);
+      virtual Node* clone(Node* node = NULL) const;
+      virtual rope_t render(render_guts_t* guts, int indentation) const;
+      virtual bool isValidlVal() const;
+  };
+
+  //
+  // NodeDynamicAttributeIdentifier
+  // children: NodeExpression
+  class NodeDynamicAttributeIdentifier: public NodeExpression {
+    public:
+      NODE_WALKER_ACCEPT_DECL;
+      NodeDynamicAttributeIdentifier(const unsigned int lineno = 0);
+      virtual Node* clone(Node* node = NULL) const;
+      virtual rope_t render(render_guts_t* guts, int indentation) const;
+      virtual bool isValidlVal() const;
+  };
+
+  //
+  // NodeStaticQualifiedIdentifier
+  // children: NodeIdentifier | NodeWildcardIdentifier, NodeIdentifier | NodeWildcardIdentifier
+  class NodeStaticQualifiedIdentifier: public NodeExpression {
+    public:
+      NODE_WALKER_ACCEPT_DECL;
+      NodeStaticQualifiedIdentifier(const unsigned int lineno = 0);
+      virtual Node* clone(Node* node = NULL) const;
+      virtual rope_t render(render_guts_t* guts, int indentation) const;
+      virtual bool isValidlVal() const;
+  };
+
+  //
+  // NodeDynamicQualifiedIdentifier
+  // children: NodeIdentifier | NodeWildcardIdentifier, NodeExpression
+  class NodeDynamicQualifiedIdentifier: public NodeExpression {
+    public:
+      NODE_WALKER_ACCEPT_DECL;
+      NodeDynamicQualifiedIdentifier(const unsigned int lineno = 0);
+      virtual Node* clone(Node* node = NULL) const;
+      virtual rope_t render(render_guts_t* guts, int indentation) const;
+      virtual bool isValidlVal() const;
+  };
+
+  //
+  // NodeFilteringPredicate
+  // children: NodeExpression, NodeExpression
+  class NodeFilteringPredicate: public NodeExpression {
+    public:
+      NODE_WALKER_ACCEPT_DECL;
+      NodeFilteringPredicate(const unsigned int lineno = 0);
+      virtual Node* clone(Node* node = NULL) const;
+      virtual rope_t render(render_guts_t* guts, int indentation) const;
+      virtual bool isValidlVal() const;
+  };
+
+  //
+  // NodeDescendantExpression
+  class NodeDescendantExpression: public NodeExpression {
+    public:
+      NODE_WALKER_ACCEPT_DECL;
+      NodeDescendantExpression(const unsigned int lineno = 0);
       virtual Node* clone(Node* node = NULL) const;
       virtual rope_t render(render_guts_t* guts, int indentation) const;
   };

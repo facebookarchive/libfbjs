@@ -43,8 +43,10 @@ struct fbjs_parse_extra {
   bool terminated;
   std::stack<int> paren_stack;
   std::stack<int> curly_stack;
+  std::stack<int> pre_xml_stack;
   int virtual_semicolon_last_state;
   int last_tok;
+  bool last_tok_xml;
   int last_paren_tok;
   int last_curly_tok;
   int lineno;

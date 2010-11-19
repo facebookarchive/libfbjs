@@ -1208,6 +1208,22 @@ rope_t NodeForIn::render(render_guts_t* guts, int indentation) const {
 }
 
 //
+// NodeForEachIn
+NodeForEachIn::NodeForEachIn(const unsigned int lineno /* = 0 */) : Node(lineno) {}
+Node* NodeForEachIn::clone(Node* node) const {
+  return Node::clone(new NodeForEachIn());
+}
+
+rope_t NodeForEachIn::render(render_guts_t* guts, int indentation) const {
+  node_list_t::const_iterator node = this->_childNodes.begin();
+  rope_t ret(guts->pretty ? "for each (" : "for each(");
+  ret += (*node)->render(guts, indentation) + " in ";
+  ret += (*++node)->render(guts, indentation) + ")";
+  ret += (*++node)->renderBlock(false, guts, indentation);
+  return ret;
+}
+
+//
 // NodeWhile
 NodeWhile::NodeWhile(const unsigned int lineno /* = 0 */) : Node(lineno) {}
 Node* NodeWhile::clone(Node* node) const {
@@ -1237,4 +1253,325 @@ rope_t NodeDoWhile::render(render_guts_t* guts, int indentation) const {
   ret += (guts->pretty ? " while (" : "while(") ;
   ret += this->_childNodes.back()->render(guts, indentation) + ")";
   return ret;
+}
+
+//
+// NodeXMLDefaultNamespace
+NodeXMLDefaultNamespace::NodeXMLDefaultNamespace(const unsigned int lineno /* = 0 */) : NodeStatement(lineno) {}
+
+Node* NodeXMLDefaultNamespace::clone(Node* node) const {
+  return Node::clone(new NodeXMLDefaultNamespace());
+}
+
+rope_t NodeXMLDefaultNamespace::render(render_guts_t* guts, int indentation) const {
+  return rope_t("default xml namespace = ") + this->_childNodes.front()->render(guts, indentation);
+}
+
+//
+// NodeXMLName
+NodeXMLName::NodeXMLName(const string &ns, const string &name, const unsigned int lineno /* = 0 */) : Node(lineno), _ns(ns), _name(name) {}
+
+Node* NodeXMLName::clone(Node* node) const {
+  return Node::clone(new NodeXMLName(this->_ns, this->_name));
+}
+
+rope_t NodeXMLName::render(render_guts_t* guts, int indentation) const {
+  if (this->_ns.empty()) {
+    return rope_t(this->_name.c_str());
+  } else {
+    return rope_t(this->_ns.c_str()) + rope_t(":") + rope_t(this->_name.c_str());
+  }
+}
+
+const string NodeXMLName::ns() const {
+  return this->_ns;
+}
+
+const string NodeXMLName::name() const {
+  return this->_name;
+}
+
+//
+// NodeXMLElement
+NodeXMLElement::NodeXMLElement(const unsigned int lineno /* = 0 */) : NodeExpression(lineno) {}
+
+Node* NodeXMLElement::clone(Node* node) const {
+  return Node::clone(new NodeXMLElement());
+}
+
+rope_t NodeXMLElement::render(render_guts_t* guts, int indentation) const {
+  rope_t ret("<");
+  node_list_t::const_iterator ii = this->_childNodes.begin();
+  if (*ii != NULL) {
+    ret += (*ii)->render(guts, indentation);
+  } else {
+    // xml list
+    ii++;
+    ret += ">";
+    ret += (*++ii)->render(guts, indentation);
+    ret += "</>";
+    return ret;
+  }
+  ++ii;
+  if (!(*ii)->empty()) {
+    ret += " ";
+    ret += (*ii)->render(guts, indentation);
+  }
+  ++ii;
+  if (!(*ii)->empty()) {
+    ret += ">";
+    ret += (*ii)->render(guts, indentation);
+    ret += "</";
+    ret += (*++ii)->render(guts, indentation);
+    ret += ">";
+  } else {
+    if ((*++ii) == NULL) {
+      ret += "/>";
+    } else {
+      ret += "</";
+      ret += (*ii)->render(guts, indentation);
+      ret += ">";
+    }
+  }
+  return ret;
+}
+
+//
+// NodeXMLComment
+NodeXMLComment::NodeXMLComment(const string &comment, const unsigned int lineno /* = 0 */) : Node(lineno), _comment(comment) {}
+
+Node* NodeXMLComment::clone(Node* node) const {
+  return Node::clone(new NodeXMLComment(this->_comment));
+}
+
+rope_t NodeXMLComment::render(render_guts_t* guts, int indentation) const {
+  rope_t ret("<!--");
+  ret += rope_t(this->_comment.c_str());
+  ret += "-->";
+  return ret;
+}
+
+const string NodeXMLComment::comment() const {
+  return this->_comment;
+}
+
+//
+// NodeXMLPI
+NodeXMLPI::NodeXMLPI(const string &data, const unsigned int lineno /* = 0 */) : Node(lineno), _data(data) {}
+
+Node* NodeXMLPI::clone(Node* node) const {
+  return Node::clone(new NodeXMLPI(this->_data));
+}
+
+rope_t NodeXMLPI::render(render_guts_t* guts, int indentation) const {
+  rope_t ret("<?");
+  ret += rope_t(this->_data.c_str());
+  ret += "?>";
+  return ret;
+}
+
+const string NodeXMLPI::data() const {
+  return this->_data;
+}
+
+//
+// NodeXMLContentList
+NodeXMLContentList::NodeXMLContentList(const unsigned int lineno /* = 0 */) : Node(lineno) {}
+
+Node* NodeXMLContentList::clone(Node* node) const {
+  return Node::clone(new NodeXMLContentList());
+}
+
+rope_t NodeXMLContentList::render(render_guts_t* guts, int indentation) const {
+  return this->renderImplodeChildren(guts, indentation, "");
+}
+
+//
+// NodeXMLTextData
+NodeXMLTextData::NodeXMLTextData(const unsigned int lineno /* = 0 */) : Node(lineno), whitespace(true) {}
+
+Node* NodeXMLTextData::clone(Node* node) const {
+  NodeXMLTextData* new_node = new NodeXMLTextData();
+  new_node->appendData(this->_data, this->whitespace);
+  return Node::clone(new_node);
+}
+
+rope_t NodeXMLTextData::render(render_guts_t* guts, int indentation) const {
+  return this->_data;
+}
+
+void NodeXMLTextData::appendData(rope_t str, bool isWhitespace /* = false */) {
+  this->_data += str;
+  if (!isWhitespace) {
+    this->whitespace = false;
+  }
+}
+
+bool NodeXMLTextData::isWhitespace() const {
+  return this->whitespace;
+}
+
+const char* NodeXMLTextData::data() const {
+  return this->_data.c_str();
+}
+
+//
+// NodeXMLEmbeddedExpression
+NodeXMLEmbeddedExpression::NodeXMLEmbeddedExpression(const unsigned int lineno /* = 0 */) : Node(lineno) {}
+
+Node* NodeXMLEmbeddedExpression::clone(Node* node) const {
+  return Node::clone(new NodeXMLEmbeddedExpression());
+}
+
+rope_t NodeXMLEmbeddedExpression::render(render_guts_t* guts, int indentation) const {
+  return rope_t("{") + this->_childNodes.front()->render(guts, indentation) + "}";
+}
+
+//
+// NodeXMLAttributeList
+NodeXMLAttributeList::NodeXMLAttributeList(const unsigned int lineno /* = 0 */) : Node(lineno) {}
+
+Node* NodeXMLAttributeList::clone(Node* node) const {
+  return Node::clone(new NodeXMLAttributeList());
+}
+
+rope_t NodeXMLAttributeList::render(render_guts_t* guts, int indentation) const {
+  return this->renderImplodeChildren(guts, indentation, " ");
+}
+
+//
+// NodeXMLAttribute
+NodeXMLAttribute::NodeXMLAttribute(const unsigned int lineno /* = 0 */) : Node(lineno) {}
+
+Node* NodeXMLAttribute::clone(Node* node) const {
+  return Node::clone(new NodeXMLAttribute());
+}
+
+rope_t NodeXMLAttribute::render(render_guts_t* guts, int indentation) const {
+  rope_t ret = this->_childNodes.front()->render(guts, indentation);
+  ret += "=";
+  Node* val = this->_childNodes.back();
+  if (typeid(*val) == typeid(NodeXMLTextData)) {
+    // TODO: Escape value, <foo bar="&amp;" /> will render to <foo bar="&" />
+    ret += "\"";
+    ret += val->render(guts, indentation);
+    ret += "\"";
+  } else {
+    ret += val->render(guts, indentation);
+  }
+  return ret;
+}
+
+//
+// NodeWildcardIdentifier
+NodeWildcardIdentifier::NodeWildcardIdentifier(const unsigned int lineno /* = 0 */) : NodeExpression(lineno) {}
+
+Node* NodeWildcardIdentifier::clone(Node* node) const {
+  return Node::clone(new NodeWildcardIdentifier());
+}
+
+rope_t NodeWildcardIdentifier::render(render_guts_t* guts, int indentation) const {
+  return rope_t("*");
+}
+
+bool NodeWildcardIdentifier::isValidlVal() const {
+  return true;
+}
+
+//
+// NodeStaticAttributeIdentifier
+NodeStaticAttributeIdentifier::NodeStaticAttributeIdentifier(const unsigned int lineno /* = 0 */) : NodeExpression(lineno) {}
+
+Node* NodeStaticAttributeIdentifier::clone(Node* node) const {
+  return Node::clone(new NodeStaticAttributeIdentifier());
+}
+
+rope_t NodeStaticAttributeIdentifier::render(render_guts_t* guts, int indentation) const {
+  return rope_t("@") + this->_childNodes.front()->render(guts, indentation);
+}
+
+bool NodeStaticAttributeIdentifier::isValidlVal() const {
+  return true;
+}
+
+//
+// NodeDynamicAttributeIdentifier
+NodeDynamicAttributeIdentifier::NodeDynamicAttributeIdentifier(const unsigned int lineno /* = 0 */) : NodeExpression(lineno) {}
+
+Node* NodeDynamicAttributeIdentifier::clone(Node* node) const {
+  return Node::clone(new NodeDynamicAttributeIdentifier());
+}
+
+rope_t NodeDynamicAttributeIdentifier::render(render_guts_t* guts, int indentation) const {
+  return rope_t("@[") + this->_childNodes.front()->render(guts, indentation) + "]";
+}
+
+bool NodeDynamicAttributeIdentifier::isValidlVal() const {
+  return true;
+}
+
+//
+// NodeStaticQualifiedIdentifier
+NodeStaticQualifiedIdentifier::NodeStaticQualifiedIdentifier(const unsigned int lineno /* = 0 */) : NodeExpression(lineno) {}
+
+Node* NodeStaticQualifiedIdentifier::clone(Node* node) const {
+  return Node::clone(new NodeStaticQualifiedIdentifier());
+}
+
+rope_t NodeStaticQualifiedIdentifier::render(render_guts_t* guts, int indentation) const {
+  return
+    this->_childNodes.front()->render(guts, indentation) + "::" +
+    this->_childNodes.back()->render(guts, indentation);
+}
+
+bool NodeStaticQualifiedIdentifier::isValidlVal() const {
+  return true;
+}
+
+//
+// NodeDynamicQualifiedIdentifier
+NodeDynamicQualifiedIdentifier::NodeDynamicQualifiedIdentifier(const unsigned int lineno /* = 0 */) : NodeExpression(lineno) {}
+
+Node* NodeDynamicQualifiedIdentifier::clone(Node* node) const {
+  return Node::clone(new NodeDynamicQualifiedIdentifier());
+}
+
+rope_t NodeDynamicQualifiedIdentifier::render(render_guts_t* guts, int indentation) const {
+  return
+    this->_childNodes.front()->render(guts, indentation) + "::[" +
+    this->_childNodes.back()->render(guts, indentation) + "]";
+}
+
+bool NodeDynamicQualifiedIdentifier::isValidlVal() const {
+  return true;
+}
+
+//
+// NodeFilteringPredicate
+NodeFilteringPredicate::NodeFilteringPredicate(const unsigned int lineno /* = 0 */) : NodeExpression(lineno) {}
+
+Node* NodeFilteringPredicate::clone(Node* node) const {
+  return Node::clone(new NodeFilteringPredicate());
+}
+
+rope_t NodeFilteringPredicate::render(render_guts_t* guts, int indentation) const {
+  return
+    this->_childNodes.front()->render(guts, indentation) + ".(" +
+    this->_childNodes.back()->render(guts, indentation) + ")";
+}
+
+bool NodeFilteringPredicate::isValidlVal() const {
+  return true;
+}
+
+//
+// NodeDescendantExpression
+NodeDescendantExpression::NodeDescendantExpression(const unsigned int lineno /* = 0 */) : NodeExpression(lineno) {}
+
+rope_t NodeDescendantExpression::render(render_guts_t* guts, int indentation) const {
+  return rope_t(this->_childNodes.front()->render(guts, indentation)) + ".." + this->_childNodes.back()->render(guts, indentation);
+}
+
+Node* NodeDescendantExpression::clone(Node* node) const {
+  return Node::clone(new NodeDescendantExpression());
 }

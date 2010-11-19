@@ -148,7 +148,25 @@ namespace fbjs {
       NODE_WALKER_VISIT_IMPL(NodeObjectLiteralProperty, Node);
       NODE_WALKER_VISIT_IMPL(NodeForLoop, Node);
       NODE_WALKER_VISIT_IMPL(NodeForIn, Node);
+      NODE_WALKER_VISIT_IMPL(NodeForEachIn, Node);
       NODE_WALKER_VISIT_IMPL(NodeWhile, Node);
       NODE_WALKER_VISIT_IMPL(NodeDoWhile, NodeStatement);
+      NODE_WALKER_VISIT_IMPL(NodeXMLDefaultNamespace, NodeStatement);
+      NODE_WALKER_VISIT_IMPL(NodeXMLName, Node);
+      NODE_WALKER_VISIT_IMPL(NodeXMLElement, NodeExpression);
+      NODE_WALKER_VISIT_IMPL(NodeXMLComment, Node);
+      NODE_WALKER_VISIT_IMPL(NodeXMLPI, Node);
+      NODE_WALKER_VISIT_IMPL(NodeXMLContentList, Node);
+      NODE_WALKER_VISIT_IMPL(NodeXMLTextData, Node);
+      NODE_WALKER_VISIT_IMPL(NodeXMLEmbeddedExpression, Node);
+      NODE_WALKER_VISIT_IMPL(NodeXMLAttributeList, Node);
+      NODE_WALKER_VISIT_IMPL(NodeXMLAttribute, Node);
+      NODE_WALKER_VISIT_IMPL(NodeWildcardIdentifier, NodeExpression);
+      NODE_WALKER_VISIT_IMPL(NodeStaticAttributeIdentifier, NodeExpression);
+      NODE_WALKER_VISIT_IMPL(NodeDynamicAttributeIdentifier, NodeExpression);
+      NODE_WALKER_VISIT_IMPL(NodeStaticQualifiedIdentifier, NodeExpression);
+      NODE_WALKER_VISIT_IMPL(NodeDynamicQualifiedIdentifier, NodeExpression);
+      NODE_WALKER_VISIT_IMPL(NodeFilteringPredicate, NodeExpression);
+      NODE_WALKER_VISIT_IMPL(NodeDescendantExpression, NodeExpression);
   };
 }

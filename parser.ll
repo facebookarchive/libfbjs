@@ -60,6 +60,12 @@ using namespace fbjs;
     case REGEX: \
       fprintf(stderr, "BEGIN(REGEX)\n"); \
       break; \
+    case XML: \
+      fprintf(stderr, "BEGIN(XML)\n"); \
+      break; \
+    case XML_CDATA: \
+      fprintf(stderr, "BEGIN(XML_CDATA)\n"); \
+      break; \
     default: \
       fprintf(stderr, "BEGIN(%d)\n", a); \
   } \
@@ -69,6 +75,7 @@ using namespace fbjs;
 #endif
 
 #define parsertok(a) parsertok_(yyg, a);
+#define parsertok_xml(a) parsertok_(yyg, a, true);
 
 int parsertok_(void*, int, bool = false);
 void terminate(void* yyscanner, const char* str);
@@ -84,7 +91,15 @@ void terminate(void* yyscanner, const char* str);
 %x VIRTUAL_SEMICOLON
 %s NO_LINEBREAK
 %x REGEX
+%x XML
+%x XML_CDATA
+%x XML_PI
 FBJSBEGIN(IDENTIFIER);
+
+/* ECMA-262 and ECMA-357 disagree on the definition of whitespace. Note: both
+   macros omit \n. You must manually scan for \n and increment yylineno. */
+JS_WHITESPACE [ \t\x0b\x0c\xa0\r]*
+XML_WHITESPACE [ \t\r]*
 
 %%
 <NO_LINEBREAK>{
@@ -99,10 +114,10 @@ FBJSBEGIN(IDENTIFIER);
   }
 }
 <INITIAL,IDENTIFIER,DOT,VIRTUAL_SEMICOLON,NO_LINEBREAK>{
-  /* start conditon is all, minus REGEX */
+  /* start conditon is all, minus REGEX and XML */
   "<!--".*  /* om nom nom */
   "//".*    |
-  [ \t\x0b\x0c\xa0\r]+ /* om nom nom */
+  {JS_WHITESPACE}+ /* om nom nom */
   "/*" {
     char c;
     bool newline = false;
@@ -188,10 +203,26 @@ FBJSBEGIN(IDENTIFIER);
   "case"  return parsertok(t_CASE);
   "continue"  return parsertok(t_CONTINUE);
   "default"  return parsertok(t_DEFAULT);
+  "default"({JS_WHITESPACE}|\n)+"xml"({JS_WHITESPACE}|\n)+"namespace" {
+    while (*++yytext) {
+      if (*yytext == '\n') {
+        ++yylloc->first_line;
+      }
+    }
+    return parsertok(t_XML_DEFAULT_NAMESPACE);
+  }
   "delete"  return parsertok(t_DELETE);
   "do"  return parsertok(t_DO);
   "else"  return parsertok(t_ELSE);
   "for"  return parsertok(t_FOR);
+  "for"({JS_WHITESPACE}|\n)+"each" {
+    while (*++yytext) {
+      if (*yytext == '\n') {
+        ++yylloc->first_line;
+      }
+    }
+    return parsertok(t_FOR_EACH);
+  }
   "function" return parsertok(t_FUNCTION);
   "if"  return parsertok(t_IF);
   "new"  return parsertok(t_NEW);
@@ -378,12 +409,119 @@ FBJSBEGIN(IDENTIFIER);
 "!"    return parsertok(t_NOT);
 "~"    return parsertok(t_BIT_NOT);
 "="    return parsertok(t_ASSIGN);
+"@"    return parsertok(t_XML_ATTRIBUTE);
+".."   return parsertok(t_XML_DESCENDENT);
+"::"   return parsertok(t_XML_QUALIFIER);
+<XML>{
+  [a-zA-Z_][a-zA-Z0-9.\-_]* {
+    yylval->string = strdup(yytext);
+    return parsertok(t_XML_NAME_FRAGMENT);
+  }
+  {XML_WHITESPACE}+ {
+    yylval->string = strdup(yytext);
+    return parsertok(t_XML_WHITESPACE);
+  }
+  \n {
+    ++yylloc->first_line;
+    yylval->string = strdup(yytext);
+    return parsertok(t_XML_WHITESPACE);
+  }
+  "<![CDATA[" {
+    FBJSBEGIN(XML_CDATA);
+  }
+  "<!--"([^\-\n]+|-[^\-\n])+"-->" {
+    yytext[yyleng - 3] = 0;
+    yylval->string = strdup(yytext + 4);
+    return t_XML_COMMENT;
+  }
+  "<?" {
+    FBJSBEGIN(XML_PI);
+  }
+  [^:={}<>"'/& \t\r\n]+ {
+    yylval->string = strdup(yytext);
+    return parsertok(t_XML_CDATA);
+  }
+  "&amp;" {
+    yylval->string = strdup("&");
+    return parsertok(t_XML_CDATA);
+  }
+  "&lt;" {
+    yylval->string = strdup("<");
+    return parsertok(t_XML_CDATA);
+  }
+  "&gt;" {
+    yylval->string = strdup(">");
+    return parsertok(t_XML_CDATA);
+  }
+  "&apos;" {
+    yylval->string = strdup("'");
+    return parsertok(t_XML_CDATA);
+  }
+  "&quot;" {
+    yylval->string = strdup("\"");
+    return parsertok(t_XML_CDATA);
+  }
+  "&" {
+    terminate(yyscanner, "invalid entity");
+    return 0;
+  }
+  ":" return parsertok(t_COLON);
+  "=" return parsertok(t_ASSIGN);
+  "{" return parsertok(t_LCURLY);
+  "}" return parsertok(t_RCURLY);
+  "<" return parsertok(t_LESS_THAN);
+  ">" return parsertok_xml(t_GREATER_THAN);
+  \" return parsertok(t_XML_QUOTE);
+  \' return parsertok(t_XML_APOS);
+  "/" return parsertok(t_DIV);
+  "</" return parsertok(t_XML_LT_DIV);
+}
+<XML_CDATA>{
+  [^\]\n]+ {
+    yymore();
+  }
+  \n {
+    ++yylloc->first_line;
+    yymore();
+  }
+  "]" {
+    yymore();
+  }
+  "]]>" {
+    /* 3 is length of "]]>" */
+    yytext[yyleng - 3] = 0;
+    yylval->string = strdup(yytext);
+    FBJSBEGIN(XML);
+    return t_XML_CDATA;
+  }
+}
+<XML_PI>{
+  [^?\n]+ {
+    yymore();
+  }
+  \n {
+    ++yylloc->first_line;
+    yymore();
+  }
+  "?" {
+    yymore();
+  }
+  "?>" {
+    /* 2 is length of "]]>" */
+    yytext[yyleng - 2] = 0;
+    yylval->string = strdup(yytext);
+    FBJSBEGIN(XML);
+    return t_XML_PI;
+  }
+}
 \n {
   ++yylloc->first_line;
   if (yyextra->last_tok == t_IDENTIFIER || yyextra->last_tok == t_NUMBER || yyextra->last_tok == t_STRING ||
     yyextra->last_tok == t_REGEX || yyextra->last_tok == t_TRUE || yyextra->last_tok == t_FALSE ||
     yyextra->last_tok == t_RPAREN || yyextra->last_tok == t_RCURLY || yyextra->last_tok == t_RBRACKET ||
-    yyextra->last_tok == t_NULL || yyextra->last_tok == t_THIS) {
+    yyextra->last_tok == t_NULL || yyextra->last_tok == t_THIS ||
+	(yyextra->last_tok_xml && yyextra->last_tok == t_GREATER_THAN)
+	) {
     yyextra->virtual_semicolon_last_state = YY_START;
     FBJSBEGIN(VIRTUAL_SEMICOLON);
     // Not to spec... sec 7.9.1
@@ -402,8 +540,9 @@ FBJSBEGIN(IDENTIFIER);
 }
 %%
 
-int parsertok_(void* guts, int tok) {
+int parsertok_(void* guts, int tok, bool was_xml) {
   yyguts_t *yyg = (struct yyguts_t*)guts;
+  if (YY_START != XML) {
   switch (tok) {
     case t_IDENTIFIER:
     case t_NUMBER:
@@ -428,13 +567,36 @@ int parsertok_(void* guts, int tok) {
     case t_PERIOD:
       FBJSBEGIN(DOT);
       break;
+      case '>':
+		FBJSBEGIN(was_xml ? INITIAL : IDENTIFIER);
+		break;
     default:
       FBJSBEGIN(IDENTIFIER);
       break;
   }
+  }
   yyextra->last_tok = tok;
+  yyextra->last_tok_xml = was_xml;
 #ifdef DEBUG_FLEX
   fprintf(stderr, "--> %s\n", yytokname(tok));
 #endif
   return tok;
+}
+
+void fbjs_push_xml_state(void* guts) {
+  yyguts_t *yyg = static_cast<yyguts_t*>(guts);
+  yyextra->pre_xml_stack.push(YY_START);
+  FBJSBEGIN(XML);
+}
+
+void fbjs_push_xml_embedded_expression_state(void* guts) {
+  yyguts_t *yyg = static_cast<yyguts_t*>(guts);
+  yyextra->pre_xml_stack.push(YY_START);
+  FBJSBEGIN(IDENTIFIER);
+}
+
+void fbjs_pop_xml_state(void* guts) {
+  yyguts_t *yyg = static_cast<yyguts_t*>(guts);
+  FBJSBEGIN(yyextra->pre_xml_stack.top());
+  yyextra->pre_xml_stack.pop();
 }
