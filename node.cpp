@@ -20,71 +20,9 @@
 
 #include "node.hpp"
 
-#include <set>
-
 extern "C" char* g_fmt(char*, double);
 using namespace std;
 using namespace fbjs;
-
-// Returns true if a given id is reserved JS keywords, see ECMA-262 sect 7.5.1
-static bool is_reserved_keyword(string id) {
-  static std::set<std::string> keyword_set;
-  static bool initialized = false;
-  if (!initialized) {
-    initialized = true;
-    static char* keywords[] = {
-      // Keywords
-      "break", "case", "catch", "continue", "default", "delete", "do", "else",
-      "finally", "for", "function", "if", "in", "instanceof", "new", "return",
-      "switch", "this", "throw", "try", "typeof", "var", "void", "while",
-      "with",
-      // Future reserved words
-      //   Our code does not respect future reserved keywords.
-      // Safari is picky about this. Don't consider them as identifiers
-      // for optimizations.
-      "abstract", "boolean", "byte", "char", "class", "const", "debugger",
-      "double", "enum", "export", "extends", "final", "float", "goto",
-      "implements", "import", "int", "interface", "long", "native",
-      "package", "private", "protected", "public", "short", "static",
-      "super", "synchronized", "throws", "transient", "volatile",
-      //
-      // NullLiteral and BooleanLiteral
-      "true", "false", "null",
-      NULL
-    };
-    for (char** ptr = keywords; *ptr != NULL; ptr++) {
-      keyword_set.insert(*ptr);
-    }
-  }
-  return keyword_set.find(id) != keyword_set.end();
-}
-
-// Returns true if a given string is a JS identifier.
-// NOTE: the function does not recognize escaped unicode as identifiers
-static bool is_identifier(std::string id) {
-  // "[a-zA-Z$_][a-zA-Z$_0-9]*]"
-  if (id.size() == 0) return false;
-
-  if (is_reserved_keyword(id)) return false;
-
-  char first = id[0];
-  if (!isalpha(first) && 
-      first != '$' &&
-      first != '_') {
-    return false;
-  }
-
-  for (int i = 1; i < id.size(); i++) {
-    char c = id[i];
-    if (!isalpha(c) && 
-        !isdigit(c) &&
-        c != '$' &&
-        c != '_') {
-      return false;
-    }
-  }
-  return true;
-}
 
 //
 // Node: All other nodes inherit from this.
@@ -247,23 +185,6 @@ unsigned int Node::lineno() const {
   return this->_lineno;
 }
 
-Node* Node::reduce() {
-  Node* tmp;
-  node_list_t::iterator ii = this->_childNodes.begin();
-  while (ii != this->_childNodes.end()) {
-    if (*ii == NULL) {
-      ++ii;
-      continue;
-    }
-    tmp = (*ii)->reduce();
-    if (tmp == NULL || tmp != *ii) {
-      this->replaceChild(tmp, ii);
-    }
-    ++ii;
-  }
-  return this;
-}
-
 bool Node::operator== (const Node &that) const {
   if (typeid(*this) != typeid(that)) {
     return false;
@@ -349,33 +270,6 @@ rope_t NodeStatementList::renderIndentedStatement(render_guts_t* guts, int inden
 
 rope_t NodeStatementList::renderStatement(render_guts_t* guts, int indentation) const {
   return this->render(guts, indentation);
-}
-
-Node* NodeStatementList::reduce() {
-  Node* tmp;
-  node_list_t::iterator ii = this->_childNodes.begin();
-  while (ii != this->_childNodes.end()) {
-    if (*ii == NULL) {
-      // This shouldn't happen...
-      this->removeChild(ii++);
-      continue;
-    }
-    tmp = (*ii)->reduce();
-    NodeExpression* expr = tmp == NULL ? NULL : dynamic_cast<NodeExpression*>(tmp);
-    if (expr != NULL) {
-      if (expr->compare(true) || expr->compare(false)) { // constant expression -- no side-effects
-        tmp = NULL;
-      }
-    }
-    if (tmp == NULL) {
-      this->removeChild(ii++);
-    } else if (tmp != *ii) {
-      this->replaceChild(tmp, ii++);
-    } else {
-      ++ii;
-    }
-  }
-  return this;
 }
 
 //
@@ -635,54 +529,6 @@ rope_t NodeOperator::render(render_guts_t* guts, int indentation) const {
   return ret;
 }
 
-Node* NodeOperator::reduce() {
-  Node::reduce();
-  NodeExpression* left = dynamic_cast<NodeExpression*>(this->_childNodes.front());
-  NodeExpression* right = dynamic_cast<NodeExpression*>(this->_childNodes.back());
-  switch (this->op) {
-    case OR:
-      if (left->compare(true)) {
-        Node* tmp = this->removeChild(this->_childNodes.begin());
-        delete this;
-        return tmp;
-      } else if (left->compare(false)) {
-        if (right->compare(true)) {
-          Node* tmp = this->removeChild(++this->_childNodes.begin());
-          delete this;
-          return tmp;
-        } else if (right->compare(false)) {
-          delete this;
-          return new NodeBooleanLiteral(false);
-        }
-      }
-      break;
-    case AND:
-      if (left->compare(false)) {
-        delete this;
-        return new NodeBooleanLiteral(false);
-      } else if (left->compare(true)) {
-        if (right->compare(false)) {
-          delete this;
-          return new NodeBooleanLiteral(false);
-        } else {
-          Node* tmp = this->removeChild(++this->_childNodes.begin());
-          delete this;
-          return tmp;
-        }
-      }
-      break;
-    case COMMA:
-      if (left->compare(false) || left->compare(true)) {
-        Node* tmp = this->removeChild(++this->_childNodes.begin());
-        delete this;
-        return tmp;
-      }
-      break;
-    default: break;
-  }
-  return this;
-}
-
 bool NodeOperator::operator== (const Node &that) const {
   return Node::operator==(that) && this->op == static_cast<const NodeOperator*>(&that)->op;
 }
@@ -702,26 +548,6 @@ rope_t NodeConditionalExpression::render(render_guts_t* guts, int indentation) c
     (guts->pretty ? " : " : ":");
   ret += (*++node)->render(guts, indentation);
   return ret;
-}
-
-Node* NodeConditionalExpression::reduce() {
-  Node::reduce();
-  NodeExpression* expression = (NodeExpression*)this->_childNodes.front();
-  bool evaluation = expression->compare(true);
-  if (!evaluation) {
-    evaluation = expression->compare(false);
-    if (!evaluation) {
-      return this;
-    }
-    evaluation = false;
-  }
-  node_list_t::iterator block = ++this->_childNodes.begin();
-  if (!evaluation) {
-    ++block;
-  }
-  Node* tmp = this->removeChild(block);
-  delete this;
-  return tmp;
 }
 
 //
@@ -880,21 +706,6 @@ bool NodeUnary::operator== (const Node &that) const {
   return Node::operator==(that) && this->op == static_cast<const NodeUnary*>(&that)->op;
 }
 
-Node* NodeUnary::reduce() {
-  if (this->op == NOT_UNARY) {
-    NodeExpression* exp = dynamic_cast<NodeExpression*>(this->childNodes().front());
-    if (exp != NULL && exp->compare(true)) {
-      delete this;
-      return new NodeBooleanLiteral(false);
-    }
-    if (exp != NULL && exp->compare(false)) {
-      delete this;
-      return new NodeBooleanLiteral(true);
-    } 
-  }
-  return this;
-}
-
 //
 // NodePostfix
 NodePostfix::NodePostfix(node_postfix_t op, const unsigned int lineno /* = 0 */) : NodeExpression(lineno), op(op) {}
@@ -1010,24 +821,6 @@ rope_t NodeFunctionCall::render(render_guts_t* guts, int indentation) const {
   return rope_t(this->_childNodes.front()->render(guts, indentation)) + this->_childNodes.back()->render(guts, indentation);
 }
 
-Node* NodeFunctionCall::reduce() {
-  Node::reduce();
-  NodeIdentifier* iden = dynamic_cast<NodeIdentifier*>(this->_childNodes.front());
-  if (iden != NULL && iden->name() == "bagofholding") {
-    delete this;
-    return new NodeBooleanLiteral(false);
-  }
-  return this;
-}
-
-bool NodeFunctionCall::isEval() const {
-  NodeIdentifier* iden = dynamic_cast<NodeIdentifier*>(this->_childNodes.front());
-  if (iden != NULL && iden->name() == "eval") {
-    return true;
-  }
-  return false;
-}
-
 //
 // NodeFunctionConstructor: new foo(1)
 NodeFunctionConstructor::NodeFunctionConstructor(const unsigned int lineno /* = 0 */) : NodeExpression(lineno) {}
@@ -1084,82 +877,6 @@ rope_t NodeIf::render(render_guts_t* guts, int indentation) const {
     }
   }
   return ret;
-}
-
-Node* NodeIf::reduce() {
-  Node::reduce();
-
-  // if (true / false) { ... } else { ... } -> ... 
-  {
-    node_list_t::iterator it = this->_childNodes.begin();
-    NodeExpression* expression = static_cast<NodeExpression*>(*it);
-    ++it;
-    if (expression->compare(true)) {
-      // take the ifBlock
-      Node* ifBlock = this->removeChild(it);
-      delete this;
-      return ifBlock;
-
-    } else if (expression->compare(false)) {
-      // take the else branch
-      ++it;
-      Node* elseBlock = *it;
-      if (elseBlock == NULL) {
-        delete this;
-        return NULL;
-      } else {
-        elseBlock = this->removeChild(it);
-        delete this;
-        return elseBlock;
-      }
-    }
-  }
-
-  // remove empty blocks
-  {
-    // Remove empty blocks. Empty blocks are most likely result of other
-    // code optimizations, e.g. 'bagofholding()'. 
-    node_list_t::iterator it = this->_childNodes.begin();
-    NodeExpression* expression = static_cast<NodeExpression*>(*it);
-    Node* ifBlock = *++it;
-    Node* elseBlock = *++it;
-
-    // If the else part is empty, it's safe to remove the else part.
-    //   if (cond) { ... } else { }  -> if (cond) { ... }
-    if (elseBlock != NULL && elseBlock->childNodes().empty()) {
-      this->replaceChild(NULL, it);  // *it == elseblock
-      delete elseBlock;
-      elseBlock = NULL;
-    }
-
-    // If both pathes are empty, replace it by the cond expression;
-    //   if (cond) { } else { } -> cond;
-    if (ifBlock->childNodes().empty() &&
-        elseBlock == NULL) {
-      Node* cond = this->removeChild(this->_childNodes.begin());
-      delete this;
-      return cond;
-    }
-
-    // If the ifBlock is empty, negate the condition, then reduce it.
-    //   if (cond) {} else { ... } -> if (!(cond)) { ... }
-    if (ifBlock->childNodes().empty() && elseBlock != NULL) {
-      // replace condition expression by !cond
-      int lineno = expression->lineno();
-      Node* new_cond = (new NodeUnary(NOT_UNARY, lineno))
-                       ->appendChild((new NodeParenthetical(lineno))
-                                     ->appendChild(expression));
-      node_list_t::iterator it_2 = this->childNodes().begin();
-      this->replaceChild(new_cond->reduce(), it_2);
-      // repalce empty ifBlock by elseBlock and remove elseBlock
-      this->replaceChild(elseBlock, ++it_2);
-      this->replaceChild(NULL, ++it_2);
-
-      delete ifBlock;
-    }
-  }
-
-  return this;
 }
 
 //
@@ -1347,31 +1064,6 @@ Node* NodeObjectLiteralProperty::clone(Node* node) const {
   return Node::clone(new NodeObjectLiteralProperty());
 }
 
-Node* NodeObjectLiteralProperty::reduce() {
-  Node::reduce();
-  if (this->childNodes().size() == 0) {
-    return this;
-  }
-
-  Node* prop_name = this->childNodes().front();
-  if (typeid(*prop_name) != typeid(NodeStringLiteral)) {
-    return this;
-  }
-
-  NodeStringLiteral* lit = static_cast<NodeStringLiteral*>(prop_name);
-  // We can only rewrite the expression when unquoted_value() can be an
-  // identifier.
-  std::string maybe_id = lit->unquoted_value();
-  if (!is_identifier(maybe_id)) {
-    return this;
-  }
-  
-  NodeIdentifier* id = new NodeIdentifier(maybe_id, lit->lineno());
-  NodeObjectLiteralProperty* result = new NodeObjectLiteralProperty(lineno());
-  // Caller's responsibility to delete this.
-  return result->appendChild(id)->appendChild(this->childNodes().back());
-}
-
 rope_t NodeObjectLiteralProperty::render(render_guts_t* guts, int indentation) const {
   return rope_t(this->_childNodes.front()->render(guts, indentation)) + (guts->pretty ? ": " : ":") +
     this->_childNodes.back()->render(guts, indentation);
@@ -1406,27 +1098,6 @@ bool NodeStaticMemberExpression::isValidlVal() const {
 //
 // NodeDynamicMemberExpression: object access via foo['bar']
 NodeDynamicMemberExpression::NodeDynamicMemberExpression(const unsigned int lineno /* = 0 */) : NodeExpression(lineno) {}
-
-Node* NodeDynamicMemberExpression::reduce() {
-  Node::reduce();
-  Node* subscription = this->childNodes().back();
-  if (typeid(*subscription) != typeid(NodeStringLiteral)) {
-    return this;
-  }
-
-  NodeStringLiteral* lit = static_cast<NodeStringLiteral*>(subscription);
-  // We can only rewrite the expression when unquoted_value() can be an
-  // identifier. Quick hack, if the identifier contains 
-  std::string maybe_id = lit->unquoted_value();
-  if (!is_identifier(maybe_id)) {
-    return this;
-  }
-  
-  NodeIdentifier* id = new NodeIdentifier(maybe_id, lit->lineno());
-  Node* result = new NodeStaticMemberExpression(this->lineno());
-  // Caller's responsibility to delete this.
-  return result->appendChild(this->childNodes().front())->appendChild(id);
-}
 
 Node* NodeDynamicMemberExpression::clone(Node* node) const {
   return Node::clone(new NodeDynamicMemberExpression());

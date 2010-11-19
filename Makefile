@@ -55,8 +55,9 @@ parser.yacc.o: parser.lex.hpp
 parser.lex.o: parser.yacc.hpp
 parser.o: parser.yacc.hpp
 node.o: parser.yacc.hpp
+walker.o: node.hpp walker.hpp
 
-libfbjs.a: parser.yacc.o parser.lex.o parser.o node.o dmg_fp_dtoa.o dmg_fp_g_fmt.o
+libfbjs.a: parser.yacc.o parser.lex.o parser.o node.o walker.o dmg_fp_dtoa.o dmg_fp_g_fmt.o
 	$(AR) rc $@ $^
 	$(AR) -s $@
 

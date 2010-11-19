@@ -25,6 +25,7 @@
 #include <list>
 #include <ext/rope>
 
+#define NODE_WALKER_ACCEPT_DECL virtual void accept(class NodeWalker& walker)
 typedef __gnu_cxx::rope<char> rope_t;
 
 namespace fbjs {
@@ -50,13 +51,14 @@ namespace fbjs {
       unsigned int _lineno;
 
     public:
+      NODE_WALKER_ACCEPT_DECL;
       Node(const unsigned int lineno = 0);
       virtual ~Node();
       virtual Node* clone(Node* node = NULL) const;
 
       bool empty() const;
       unsigned int lineno() const;
-      virtual Node* reduce();
+      void setLineno(const unsigned int lineno) { _lineno = lineno; }
       virtual bool operator== (const Node&) const;
       virtual bool operator!= (const Node&) const;
 
@@ -80,6 +82,7 @@ namespace fbjs {
   // NodeProgram
   class NodeProgram: public Node {
     public:
+      NODE_WALKER_ACCEPT_DECL;
       NodeProgram();
       NodeProgram(const char* code);
       NodeProgram(FILE* file);
@@ -90,19 +93,20 @@ namespace fbjs {
   // NodeStatementList
   class NodeStatementList: public Node {
     public:
+      NODE_WALKER_ACCEPT_DECL;
       NodeStatementList(const unsigned int lineno = 0);
       virtual Node* clone(Node* node = NULL) const;
       virtual rope_t render(render_guts_t* guts, int indentation) const;
       virtual rope_t renderBlock(bool must, render_guts_t* guts, int indentation) const;
       virtual rope_t renderStatement(render_guts_t* guts, int indentation) const;
       virtual rope_t renderIndentedStatement(render_guts_t* guts, int indentation) const;
-      virtual Node* reduce();
   };
 
   //
   // NodeExpression (abstract)
   class NodeExpression: public Node {
     public:
+      NODE_WALKER_ACCEPT_DECL;
       NodeExpression(const unsigned int lineno = 0);
       virtual bool isValidlVal() const;
       virtual rope_t render(render_guts_t* guts, int indentation) const = 0;
@@ -116,6 +120,7 @@ namespace fbjs {
     protected:
       double value;
     public:
+      NODE_WALKER_ACCEPT_DECL;
       NodeNumericLiteral(double value, const unsigned int lineno = 0);
       virtual Node* clone(Node* node = NULL) const;
       virtual rope_t render(render_guts_t* guts, int indentation) const;
@@ -130,12 +135,8 @@ namespace fbjs {
       std::string value;
       bool quoted;
     public:
+      NODE_WALKER_ACCEPT_DECL;
       NodeStringLiteral(std::string value, bool quoted, const unsigned int lineno = 0);
-      std::string unquoted_value() {
-        if (!quoted) return value;
-        return value.substr(1, value.size() - 2);
-      }
-      
       virtual Node* clone(Node* node = NULL) const;
       virtual rope_t render(render_guts_t* guts, int indentation) const;
       virtual bool operator== (const Node&) const;
@@ -148,6 +149,7 @@ namespace fbjs {
       std::string value;
       std::string flags;
     public:
+      NODE_WALKER_ACCEPT_DECL;
       NodeRegexLiteral(std::string value, std::string flags, const unsigned int lineno = 0);
       virtual Node* clone(Node* node = NULL) const;
       virtual rope_t render(render_guts_t* guts, int indentation) const;
@@ -160,6 +162,7 @@ namespace fbjs {
     protected:
       bool value;
     public:
+      NODE_WALKER_ACCEPT_DECL;
       NodeBooleanLiteral(bool value, const unsigned int lineno = 0);
       virtual Node* clone(Node* node = NULL) const;
       virtual rope_t render(render_guts_t* guts, int indentation) const;
@@ -171,6 +174,7 @@ namespace fbjs {
   // NodeNullLiteral
   class NodeNullLiteral: public NodeExpression {
     public:
+      NODE_WALKER_ACCEPT_DECL;
       NodeNullLiteral(const unsigned int lineno = 0);
       virtual Node* clone(Node* node = NULL) const;
       virtual rope_t render(render_guts_t* guts, int indentation) const;
@@ -180,6 +184,7 @@ namespace fbjs {
   // NodeThis
   class NodeThis: public NodeExpression {
     public:
+      NODE_WALKER_ACCEPT_DECL;
       NodeThis(const unsigned int lineno = 0);
       virtual Node* clone(Node* node = NULL) const;
       virtual rope_t render(render_guts_t* guts, int indentation) const;
@@ -189,6 +194,7 @@ namespace fbjs {
   // NodeEmptyExpression
   class NodeEmptyExpression: public NodeExpression {
     public:
+      NODE_WALKER_ACCEPT_DECL;
       NodeEmptyExpression(const unsigned int lineno = 0);
       virtual Node* clone(Node* node = NULL) const;
       virtual rope_t render(render_guts_t* guts, int indentation) const;
@@ -211,10 +217,10 @@ namespace fbjs {
     protected:
       node_operator_t op;
     public:
+      NODE_WALKER_ACCEPT_DECL;
       NodeOperator(node_operator_t op, const unsigned int lineno = 0);
       virtual Node* clone(Node* node = NULL) const;
       virtual rope_t render(render_guts_t* guts, int indentation) const;
-      virtual Node* reduce();
       virtual bool operator== (const Node&) const;
   };
 
@@ -222,16 +228,17 @@ namespace fbjs {
   // NodeConditionalExpression
   class NodeConditionalExpression: public NodeExpression {
     public:
+      NODE_WALKER_ACCEPT_DECL;
       NodeConditionalExpression(const unsigned int lineno = 0);
       virtual Node* clone(Node* node = NULL) const;
       virtual rope_t render(render_guts_t* guts, int indentation) const;
-      virtual Node* reduce();
   };
 
   //
   // NodeParenthetical
   class NodeParenthetical: public NodeExpression {
     public:
+      NODE_WALKER_ACCEPT_DECL;
       NodeParenthetical(const unsigned int lineno = 0);
       virtual Node* clone(Node* node = NULL) const;
       virtual rope_t render(render_guts_t* guts, int indentation) const;
@@ -251,6 +258,7 @@ namespace fbjs {
     protected:
       node_assignment_t op;
     public:
+      NODE_WALKER_ACCEPT_DECL;
       NodeAssignment(node_assignment_t op, const unsigned int lineno = 0);
       virtual Node* clone(Node* node = NULL) const;
       virtual rope_t render(render_guts_t* guts, int indentation) const;
@@ -270,10 +278,10 @@ namespace fbjs {
     protected:
       node_unary_t op;
     public:
+      NODE_WALKER_ACCEPT_DECL;
       NodeUnary(node_unary_t op, const unsigned int lineno = 0);
       virtual Node* clone(Node* node = NULL) const;
       virtual rope_t render(render_guts_t* guts, int indentation) const;
-      virtual Node* reduce();
       const node_unary_t operatorType() const;
       virtual bool operator== (const Node&) const;
   };
@@ -287,6 +295,7 @@ namespace fbjs {
     protected:
       node_postfix_t op;
     public:
+      NODE_WALKER_ACCEPT_DECL;
       NodePostfix(node_postfix_t op, const unsigned int lineno = 0);
       virtual Node* clone(Node* node = NULL) const;
       virtual rope_t render(render_guts_t* guts, int indentation) const;
@@ -299,6 +308,7 @@ namespace fbjs {
     protected:
       std::string _name;
     public:
+      NODE_WALKER_ACCEPT_DECL;
       NodeIdentifier(std::string name, const unsigned int lineno = 0);
       virtual Node* clone(Node* node = NULL) const;
       virtual rope_t render(render_guts_t* guts, int indentation) const;
@@ -312,17 +322,17 @@ namespace fbjs {
   // NodeFunctionCall
   class NodeFunctionCall: public NodeExpression {
     public:
+      NODE_WALKER_ACCEPT_DECL;
       NodeFunctionCall(const unsigned int lineno = 0);
       virtual rope_t render(render_guts_t* guts, int indentation) const;
       virtual Node* clone(Node* node = NULL) const;
-      virtual Node* reduce();
-      bool isEval() const;
   };
 
   //
   // NodeFunctionConstructor
   class NodeFunctionConstructor: public NodeExpression {
     public:
+      NODE_WALKER_ACCEPT_DECL;
       NodeFunctionConstructor(const unsigned int lineno = 0);
       virtual Node* clone(Node* node = NULL) const;
       virtual rope_t render(render_guts_t* guts, int indentation) const;
@@ -332,6 +342,7 @@ namespace fbjs {
   // NodeObjectLiteral
   class NodeObjectLiteral: public NodeExpression {
     public:
+      NODE_WALKER_ACCEPT_DECL;
       NodeObjectLiteral(const unsigned int lineno = 0);
       virtual Node* clone(Node* node = NULL) const;
       virtual rope_t render(render_guts_t* guts, int indentation) const;
@@ -341,6 +352,7 @@ namespace fbjs {
   // NodeArrayLiteral
   class NodeArrayLiteral: public NodeExpression {
     public:
+      NODE_WALKER_ACCEPT_DECL;
       NodeArrayLiteral(const unsigned int lineno = 0);
       virtual Node* clone(Node* node = NULL) const;
       virtual rope_t render(render_guts_t* guts, int indentation) const;
@@ -350,6 +362,7 @@ namespace fbjs {
   // NodeStaticMemberExpression
   class NodeStaticMemberExpression: public NodeExpression {
     public:
+      NODE_WALKER_ACCEPT_DECL;
       NodeStaticMemberExpression(const unsigned int lineno = 0);
       virtual Node* clone(Node* node = NULL) const;
       virtual rope_t render(render_guts_t* guts, int indentation) const;
@@ -360,8 +373,8 @@ namespace fbjs {
   // NodeDynamicMemberExpression
   class NodeDynamicMemberExpression: public NodeExpression {
     public:
+      NODE_WALKER_ACCEPT_DECL;
       NodeDynamicMemberExpression(const unsigned int lineno = 0);
-      virtual Node* reduce();
       virtual Node* clone(Node* node = NULL) const;
       virtual rope_t render(render_guts_t* guts, int indentation) const;
       virtual bool isValidlVal() const;
@@ -371,6 +384,7 @@ namespace fbjs {
   // NodeStatement (abstract)
   class NodeStatement: public Node {
     public:
+      NODE_WALKER_ACCEPT_DECL;
       NodeStatement(const unsigned int lineno = 0);
       virtual rope_t render(render_guts_t* guts, int indentation) const = 0;
       virtual rope_t renderStatement(render_guts_t* guts, int indentation) const;
@@ -385,6 +399,7 @@ namespace fbjs {
     protected:
       node_statement_with_expression_t statement;
     public:
+      NODE_WALKER_ACCEPT_DECL;
       NodeStatementWithExpression(node_statement_with_expression_t statement, const unsigned int lineno = 0);
       virtual Node* clone(Node* node = NULL) const;
       virtual rope_t render(render_guts_t* guts, int indentation) const;
@@ -397,6 +412,7 @@ namespace fbjs {
     protected:
       bool _iterator;
     public:
+      NODE_WALKER_ACCEPT_DECL;
       NodeVarDeclaration(bool iterator = false, const unsigned int lineno = 0);
       virtual Node* clone(Node* node = NULL) const;
       virtual rope_t render(render_guts_t* guts, int indentation) const;
@@ -408,6 +424,7 @@ namespace fbjs {
   // NodeFunctionDeclaration
   class NodeFunctionDeclaration: public Node {
     public:
+      NODE_WALKER_ACCEPT_DECL;
       NodeFunctionDeclaration(const unsigned int lineno = 0);
       virtual Node* clone(Node* node = NULL) const;
       virtual rope_t render(render_guts_t* guts, int indentation) const;
@@ -417,6 +434,7 @@ namespace fbjs {
   // NodeFunctionExpression
   class NodeFunctionExpression: public NodeExpression {
     public:
+      NODE_WALKER_ACCEPT_DECL;
       NodeFunctionExpression(const unsigned int lineno = 0);
       virtual Node* clone(Node* node = NULL) const;
       virtual rope_t render(render_guts_t* guts, int indentation) const;
@@ -426,6 +444,7 @@ namespace fbjs {
   // NodeArgList
   class NodeArgList: public Node {
     public:
+      NODE_WALKER_ACCEPT_DECL;
       NodeArgList(const unsigned int lineno = 0);
       virtual Node* clone(Node* node = NULL) const;
       virtual rope_t render(render_guts_t* guts, int indentation) const;
@@ -435,16 +454,17 @@ namespace fbjs {
   // NodeIf
   class NodeIf: public Node {
     public:
+      NODE_WALKER_ACCEPT_DECL;
       NodeIf(const unsigned int lineno = 0);
       virtual Node* clone(Node* node = NULL) const;
       virtual rope_t render(render_guts_t* guts, int indentation) const;
-      virtual Node* reduce();
   };
 
   //
   // NodeWith
   class NodeWith: public Node {
     public:
+      NODE_WALKER_ACCEPT_DECL;
       NodeWith(const unsigned int lineno = 0);
       virtual Node* clone(Node* node = NULL) const;
       virtual rope_t render(render_guts_t* guts, int indentation) const;
@@ -454,6 +474,7 @@ namespace fbjs {
   // NodeTry
   class NodeTry: public Node {
     public:
+      NODE_WALKER_ACCEPT_DECL;
       NodeTry(const unsigned int lineno = 0);
       virtual Node* clone(Node* node = NULL) const;
       virtual rope_t render(render_guts_t* guts, int indentation) const;
@@ -463,6 +484,7 @@ namespace fbjs {
   // NodeLabel
   class NodeLabel: public Node {
     public:
+      NODE_WALKER_ACCEPT_DECL;
       NodeLabel(const unsigned int lineno = 0);
       virtual Node* clone(Node* node = NULL) const;
       virtual rope_t render(render_guts_t* guts, int indentation) const;
@@ -473,6 +495,7 @@ namespace fbjs {
   // NodeCaseClause
   class NodeCaseClause: public Node {
     public:
+      NODE_WALKER_ACCEPT_DECL;
       NodeCaseClause(const unsigned int lineno = 0);
       virtual Node* clone(Node* node = NULL) const;
       virtual rope_t render(render_guts_t* guts, int indentation) const;
@@ -484,6 +507,7 @@ namespace fbjs {
   // NodeSwitch
   class NodeSwitch: public Node {
     public:
+      NODE_WALKER_ACCEPT_DECL;
       NodeSwitch(const unsigned int lineno = 0);
       virtual Node* clone(Node* node = NULL) const;
       virtual rope_t render(render_guts_t* guts, int indentation) const;
@@ -493,6 +517,7 @@ namespace fbjs {
   // NodeDefaultClause
   class NodeDefaultClause: public NodeCaseClause {
     public:
+      NODE_WALKER_ACCEPT_DECL;
       NodeDefaultClause(const unsigned int lineno = 0);
       virtual Node* clone(Node* node = NULL) const;
       virtual rope_t render(render_guts_t* guts, int indentation) const;
@@ -502,8 +527,8 @@ namespace fbjs {
   // NodeObjectLiteralProperty
   class NodeObjectLiteralProperty: public Node {
     public:
+      NODE_WALKER_ACCEPT_DECL;
       NodeObjectLiteralProperty(const unsigned int lineno = 0);
-      virtual Node* reduce();
       virtual Node* clone(Node* node = NULL) const;
       virtual rope_t render(render_guts_t* guts, int indentation) const;
   };
@@ -512,6 +537,7 @@ namespace fbjs {
   // NodeForLoop
   class NodeForLoop: public Node {
     public:
+      NODE_WALKER_ACCEPT_DECL;
       NodeForLoop(const unsigned int lineno = 0);
       virtual Node* clone(Node* node = NULL) const;
       virtual rope_t render(render_guts_t* guts, int indentation) const;
@@ -521,6 +547,7 @@ namespace fbjs {
   // NodeForIn
   class NodeForIn: public Node {
     public:
+      NODE_WALKER_ACCEPT_DECL;
       NodeForIn(const unsigned int lineno = 0);
       virtual Node* clone(Node* node = NULL) const;
       virtual rope_t render(render_guts_t* guts, int indentation) const;
@@ -530,6 +557,7 @@ namespace fbjs {
   // NodeWhile
   class NodeWhile: public Node {
     public:
+      NODE_WALKER_ACCEPT_DECL;
       NodeWhile(const unsigned int lineno = 0);
       virtual Node* clone(Node* node = NULL) const;
       virtual rope_t render(render_guts_t* guts, int indentation) const;
@@ -539,6 +567,7 @@ namespace fbjs {
   // NodeDoWhile
   class NodeDoWhile: public NodeStatement {
     public:
+      NODE_WALKER_ACCEPT_DECL;
       NodeDoWhile(const unsigned int lineno = 0);
       virtual Node* clone(Node* node = NULL) const;
       virtual rope_t render(render_guts_t* guts, int indentation) const;
