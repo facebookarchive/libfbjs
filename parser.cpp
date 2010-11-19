@@ -26,20 +26,14 @@ extern int yydebug;
 using namespace std;
 using namespace fbjs;
 
-ParseException::ParseException(const string msg) {
-  memcpy(error, msg.c_str(), msg.length() > 127 ? 128 : msg.length() + 1);
-  error[127] = 0;
-}
-
-const char* ParseException::what() const throw() {
-  return error;
-}
-
 void* fbjs_init_parser(fbjs_parse_extra* extra) {
 
   // Initialize the scanner.
   void* scanner;
   yylex_init_extra(extra, &scanner);
+  extra->error = NULL;
+  extra->error_line = 0;
+  extra->terminated = false;
   extra->lineno = 1;
   extra->last_tok = 0;
   extra->last_paren_tok = 0;
@@ -57,11 +51,10 @@ void* fbjs_init_parser(fbjs_parse_extra* extra) {
 
 void fbjs_cleanup_parser(fbjs_parse_extra* extra, void* scanner) {
   yylex_destroy(scanner);
-  if (!extra->errors.empty()) {
-    list<string>::iterator ii;
-    for (ii = extra->errors.begin(); ii != extra->errors.end(); ++ii) {
-      throw ParseException(*ii);
-    }
+  if (extra->error != NULL) {
+    string error(extra->error);
+    free(extra->error);
+    throw ParseException(error, extra->error_line);
   }
 }
 

@@ -38,7 +38,9 @@
 #include "libfbjs/parser.yy.h"
 #endif
 struct fbjs_parse_extra {
-  std::list<std::string> errors;
+  char* error;
+  int error_line;
+  bool terminated;
   std::stack<int> paren_stack;
   std::stack<int> curly_stack;
   int virtual_semicolon_last_state;
@@ -46,7 +48,6 @@ struct fbjs_parse_extra {
   int last_paren_tok;
   int last_curly_tok;
   int lineno;
-  const char* strstream;
 };
 
 // Why the hell doesn't flex provide a header file?
@@ -55,6 +56,7 @@ int yylex(YYSTYPE* param, YYLTYPE* yylloc, void* scanner);
 int yylex_init_extra(YY_EXTRA_TYPE user_defined, void** scanner);
 int yylex_destroy(void* scanner);
 YY_EXTRA_TYPE yyget_extra(void* scanner);
+YYLTYPE* yyget_lloc(void* yyscanner);
 void yyset_extra(YY_EXTRA_TYPE arbitrary_data, void* scanner);
 void yyset_debug(int bdebug, void* yyscanner);
 void yyrestart(FILE* input_file, void* yyscanner);

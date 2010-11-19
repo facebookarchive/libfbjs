@@ -20,9 +20,11 @@
 
 #pragma once
 #include <stdio.h>
+#include <stdlib.h>
 #include <stdexcept>
 #include <sstream>
 #include <list>
+#include <memory>
 #include <ext/rope>
 
 #define NODE_WALKER_ACCEPT_DECL virtual void accept(class NodeWalker& walker)
@@ -132,11 +134,16 @@ namespace fbjs {
   // NodeStringLiteral
   class NodeStringLiteral: public NodeExpression {
     protected:
-      std::string value;
+      const std::string value;
       bool quoted;
     public:
       NODE_WALKER_ACCEPT_DECL;
-      NodeStringLiteral(std::string value, bool quoted, const unsigned int lineno = 0);
+      NodeStringLiteral(const std::string& value, bool quoted, const unsigned int lineno = 0);
+      std::string unquoted_value() const {
+        if (!quoted) return value;
+        return value.substr(1, value.size() - 2);
+      }
+
       virtual Node* clone(Node* node = NULL) const;
       virtual rope_t render(render_guts_t* guts, int indentation) const;
       virtual bool operator== (const Node&) const;
@@ -146,11 +153,11 @@ namespace fbjs {
   // NodeRegexLiteral
   class NodeRegexLiteral: public NodeExpression {
     protected:
-      std::string value;
-      std::string flags;
+      const std::string value;
+      const std::string flags;
     public:
       NODE_WALKER_ACCEPT_DECL;
-      NodeRegexLiteral(std::string value, std::string flags, const unsigned int lineno = 0);
+      NodeRegexLiteral(const std::string& value, const std::string& flags, const unsigned int lineno = 0);
       virtual Node* clone(Node* node = NULL) const;
       virtual rope_t render(render_guts_t* guts, int indentation) const;
       virtual bool operator== (const Node&) const;
@@ -221,6 +228,7 @@ namespace fbjs {
       NodeOperator(node_operator_t op, const unsigned int lineno = 0);
       virtual Node* clone(Node* node = NULL) const;
       virtual rope_t render(render_guts_t* guts, int indentation) const;
+      const node_operator_t operatorType() const { return op; };
       virtual bool operator== (const Node&) const;
   };
 
@@ -262,7 +270,7 @@ namespace fbjs {
       NodeAssignment(node_assignment_t op, const unsigned int lineno = 0);
       virtual Node* clone(Node* node = NULL) const;
       virtual rope_t render(render_guts_t* guts, int indentation) const;
-      const node_assignment_t operatorType() const;
+      const node_assignment_t operatorType() const { return op; };
       virtual bool operator== (const Node&) const;
   };
 
@@ -282,7 +290,7 @@ namespace fbjs {
       NodeUnary(node_unary_t op, const unsigned int lineno = 0);
       virtual Node* clone(Node* node = NULL) const;
       virtual rope_t render(render_guts_t* guts, int indentation) const;
-      const node_unary_t operatorType() const;
+      const node_unary_t operatorType() const { return op; };
       virtual bool operator== (const Node&) const;
   };
 
@@ -309,12 +317,12 @@ namespace fbjs {
       std::string _name;
     public:
       NODE_WALKER_ACCEPT_DECL;
-      NodeIdentifier(std::string name, const unsigned int lineno = 0);
+      NodeIdentifier(const std::string& name, const unsigned int lineno = 0);
       virtual Node* clone(Node* node = NULL) const;
       virtual rope_t render(render_guts_t* guts, int indentation) const;
-      virtual std::string name() const;
+      const std::string& name() const;
       virtual bool isValidlVal() const;
-      virtual void rename(const std::string &str);
+      void rename(const std::string &str);
       virtual bool operator== (const Node&) const;
   };
 
@@ -575,11 +583,21 @@ namespace fbjs {
 
   //
   // Parser exception
-  class ParseException: public std::exception {
+  class ParseException: public std::runtime_error {
+    private:
+      mutable std::string wut;
+      int lineno;
     public:
-      char error[128];
-      ParseException(const std::string msg);
-      const char* what() const throw();
+      ParseException(const std::string& what_arg, const int lineno) : std::runtime_error(what_arg), lineno(lineno) {}
+      ~ParseException() throw() {}
+      const char* what() const throw() {
+        if (wut.empty()) {
+          wut =
+            "SyntaxError on line " +
+            static_cast<std::stringstream&>(std::stringstream() << lineno << ": ").str() +
+            std::runtime_error::what();
+        }
+        return wut.c_str();
+      }
   };
-
 }

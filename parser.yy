@@ -43,16 +43,20 @@
   #define yylineno (unsigned int)(yylloc.first_line)
   #define parsererror(str) yyerror(&yylloc, yyscanner, NULL, str)
 
-  void parser_note_error(void* yyscanner, const char* str) {
+  void terminate(void* yyscanner, const char* str) {
     fbjs_parse_extra* extra = yyget_extra(yyscanner);
-    extra->errors.push_back(str);
+    if (!extra->terminated) {
+      YYLTYPE* loc = yyget_lloc(yyscanner);
+      extra->error = strdup(str);
+      extra->error_line = loc->first_line;
+      extra->terminated = true;
+    }
   }
 
   void yyerror(YYLTYPE* yyloc, void* yyscanner, void* node, const char* str) {
-    char loc[1024];
-    sprintf(loc, "Error on line %d: %s", yyloc->first_line, str);
-    parser_note_error(yyscanner, loc);
+    terminate(yyscanner, str);
   }
+
 %}
 
 %locations

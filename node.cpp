@@ -313,7 +313,7 @@ bool NodeNumericLiteral::operator== (const Node &that) const {
 
 //
 // NodeStringLiteral: "Hello."
-NodeStringLiteral::NodeStringLiteral(string value, bool quoted, const unsigned int lineno /* = 0 */) : NodeExpression(lineno), value(value), quoted(quoted) {}
+NodeStringLiteral::NodeStringLiteral(const string &value, bool quoted, const unsigned int lineno /* = 0 */) : NodeExpression(lineno), value(value), quoted(quoted) {}
 
 Node* NodeStringLiteral::clone(Node* node) const {
   return new NodeStringLiteral(this->value, this->quoted);
@@ -323,7 +323,63 @@ rope_t NodeStringLiteral::render(render_guts_t* guts, int indentation) const {
   if (this->quoted) {
     return rope_t(this->value.c_str());
   } else {
+    const char *val = this->value.c_str();
+    size_t len = 0;
+    for (const char* ii = val; *ii; ++ii) {
+      if (*ii < 32) {
+        switch (*ii) {
+          case '\'': case '\\': case '\b': case '\f': case '\n': case '\r': case '\t':
+            len += 2;
+            break;
+          default:
+            len += 4;
+        }
+      } else {
+        ++len;
+      }
+    }
+    if (len == this->value.size()) {
     return rope_t("\"") + this->value.c_str() + "\"";
+    } else {
+      char *new_str = new char[len + 1];
+      char *ii = new_str;
+      new_str[len] = 0;
+      for (; *val; ++val) {
+        if (*val == '\'') {
+          sprintf(ii, "\\'");
+          ii += 2;
+        } else if (*val == '\\') {
+          sprintf(ii, "\\'");
+          ii += 2;
+        } else if (*val == '\b') {
+          sprintf(ii, "\\b");
+          ii += 2;
+        } else if (*val == '\f') {
+          sprintf(ii, "\\f");
+          ii += 2;
+        } else if (*val == '\n') {
+          sprintf(ii, "\\n");
+          ii += 2;
+        } else if (*val == '\r') {
+          sprintf(ii, "\\r");
+          ii += 2;
+        } else if (*val == '\t') {
+          sprintf(ii, "\\t");
+          ii += 2;
+        } else if (*val < 32) {
+          sprintf(ii, "\\x%02x", *val);
+          ii += 4;
+        } else {
+          *ii = *val;
+          ++ii;
+        }
+      }
+      rope_t ret("\"");
+      ret += new_str;
+      ret += "\"";
+      delete[] new_str;
+      return ret;
+    }
   }
 }
 
@@ -334,7 +390,7 @@ bool NodeStringLiteral::operator== (const Node &that) const {
 
 //
 // NodeRegexLiteral: /foo|bar/
-NodeRegexLiteral::NodeRegexLiteral(string value, string flags, const unsigned int lineno /* = 0 */) : NodeExpression(lineno), value(value), flags(flags) {}
+NodeRegexLiteral::NodeRegexLiteral(const string &value, const string &flags, const unsigned int lineno /* = 0 */) : NodeExpression(lineno), value(value), flags(flags) {}
 
 Node* NodeRegexLiteral::clone(Node* node) const {
   return new NodeRegexLiteral(this->value, this->flags);
@@ -551,7 +607,7 @@ rope_t NodeConditionalExpression::render(render_guts_t* guts, int indentation) c
 }
 
 //
-// NodeParenthetical: an expression in ()'s. this is actually implicit in the AST, but we also make it an explicit
+// NodeParenthetical: an expression in ()'s. This is actually implicit in the AST, but we also make it an explicit
 // node. Otherwise, the renderer would have to be aware of operator precedence which would be cumbersome.
 NodeParenthetical::NodeParenthetical(const unsigned int lineno /* = 0 */) : NodeExpression(lineno) {}
 Node* NodeParenthetical::clone(Node* node) const {
@@ -640,10 +696,6 @@ rope_t NodeAssignment::render(render_guts_t* guts, int indentation) const {
   return ret;
 }
 
-const node_assignment_t NodeAssignment::operatorType() const {
-  return this->op;
-}
-
 bool NodeAssignment::operator== (const Node &that) const {
   return Node::operator==(that) && this->op == static_cast<const NodeAssignment*>(&that)->op;
 }
@@ -698,10 +750,6 @@ rope_t NodeUnary::render(render_guts_t* guts, int indentation) const {
   return ret;
 }
 
-const node_unary_t NodeUnary::operatorType() const {
-  return this->op;
-}
-
 bool NodeUnary::operator== (const Node &that) const {
   return Node::operator==(that) && this->op == static_cast<const NodeUnary*>(&that)->op;
 }
@@ -733,7 +781,7 @@ bool NodePostfix::operator== (const Node &that) const {
 
 //
 // NodeIdentifier
-NodeIdentifier::NodeIdentifier(string name, const unsigned int lineno /* = 0 */) : NodeExpression(lineno), _name(name) {}
+NodeIdentifier::NodeIdentifier(const string &name, const unsigned int lineno /* = 0 */) : NodeExpression(lineno), _name(name) {}
 
 Node* NodeIdentifier::clone(Node* node) const {
   return Node::clone(new NodeIdentifier(this->_name));
@@ -743,7 +791,7 @@ rope_t NodeIdentifier::render(render_guts_t* guts, int indentation) const {
   return rope_t(this->_name.c_str());
 }
 
-string NodeIdentifier::name() const {
+const string& NodeIdentifier::name() const {
   return this->_name;
 }
 
@@ -751,7 +799,7 @@ bool NodeIdentifier::isValidlVal() const {
   return true;
 }
 
-void NodeIdentifier::rename(const std::string &str) {
+void NodeIdentifier::rename(const string &str) {
   this->_name = str;
 }
 

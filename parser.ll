@@ -37,6 +37,8 @@
 
 using namespace fbjs;
 
+#define YY_USER_ACTION if (yyextra->terminated) return 0;
+
 #ifdef DEBUG_FLEX
 #define FBJSBEGIN(a) if(a!=YY_START) { \
   switch(a) { \
@@ -68,7 +70,8 @@ using namespace fbjs;
 
 #define parsertok(a) parsertok_(yyg, a);
 
-int parsertok_(void*, int);
+int parsertok_(void*, int, bool = false);
+void terminate(void* yyscanner, const char* str);
 %}
 
 %option noyywrap

@@ -70,4 +70,4 @@ clean:
     parser.lex.cpp parser.yacc.cpp parser.yacc.hpp parser.yacc.output \
     libfbjs.so libfbjs.a \
     dmg_fp_dtoa.o dmg_fp_g_fmt.o \
-    parser.lex.o parser.yacc.o parser.o node.o
+    parser.lex.o parser.yacc.o parser.o node.o walker.o
