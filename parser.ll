@@ -98,11 +98,9 @@ FBJSBEGIN(IDENTIFIER);
     yyless(0);
   }
 }
-<IDENTIFIER,DOT,VIRTUAL_SEMICOLON,NO_LINEBREAK>{
+<INITIAL,IDENTIFIER,DOT,VIRTUAL_SEMICOLON,NO_LINEBREAK>{
   /* start conditon is all, minus REGEX */
   "<!--".*  /* om nom nom */
-}
-<*>{
   "//".*    |
   [ \t\x0b\x0c\xa0\r]+ /* om nom nom */
   "/*" {
@@ -242,7 +240,10 @@ FBJSBEGIN(IDENTIFIER);
 }
 <DOT>{
   \n ++yylloc->first_line;
-  [^a-zA-Z$_]+ /* om nom nom */
+  . {
+    FBJSBEGIN(INITIAL);
+    yyless(0);
+  }
 }
 '|\" {
   std::string str = yytext;

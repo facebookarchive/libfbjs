@@ -134,6 +134,7 @@ namespace fbjs {
       NODE_WALKER_VISIT_IMPL(NodeStatement, Node);
       NODE_WALKER_VISIT_IMPL(NodeStatementWithExpression, NodeStatement);
       NODE_WALKER_VISIT_IMPL(NodeVarDeclaration, NodeStatement);
+      NODE_WALKER_VISIT_IMPL(NodeTypehint, Node);
       NODE_WALKER_VISIT_IMPL(NodeFunctionDeclaration, Node);
       NODE_WALKER_VISIT_IMPL(NodeFunctionExpression, NodeExpression);
       NODE_WALKER_VISIT_IMPL(NodeArgList, Node);

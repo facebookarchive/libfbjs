@@ -1095,6 +1095,20 @@ Node* NodeVarDeclaration::setIterator(bool iterator) {
 }
 
 //
+// NodeTypehint: a variable declaration with a typehint
+NodeTypehint::NodeTypehint(const unsigned int lineno /* = 0 */) : Node(lineno) {}
+Node* NodeTypehint::clone(Node* node) const {
+  return Node::clone(new NodeTypehint());
+}
+
+rope_t NodeTypehint::render(render_guts_t* guts, int indentation) const {
+  rope_t ret =
+    this->_childNodes.front()->render(guts, indentation) + ":" +
+    this->_childNodes.back()->render(guts, indentation);
+  return ret;
+}
+
+//
 // NodeObjectLiteral
 NodeObjectLiteral::NodeObjectLiteral(const unsigned int lineno /* = 0 */) : NodeExpression(lineno) {}
 Node* NodeObjectLiteral::clone(Node* node) const {

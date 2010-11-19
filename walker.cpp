@@ -50,6 +50,7 @@ NODE_WALKER_ACCEPT_IMPL(NodeDynamicMemberExpression, NodeExpression);
 NODE_WALKER_ACCEPT_IMPL(NodeStatement, Node);
 NODE_WALKER_ACCEPT_IMPL(NodeStatementWithExpression, NodeStatement);
 NODE_WALKER_ACCEPT_IMPL(NodeVarDeclaration, NodeStatement);
+NODE_WALKER_ACCEPT_IMPL(NodeTypehint, Node);
 NODE_WALKER_ACCEPT_IMPL(NodeFunctionDeclaration, Node);
 NODE_WALKER_ACCEPT_IMPL(NodeFunctionExpression, NodeExpression);
 NODE_WALKER_ACCEPT_IMPL(NodeArgList, Node);

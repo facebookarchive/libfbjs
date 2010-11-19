@@ -42,6 +42,11 @@
   using namespace fbjs;
   #define yylineno (unsigned int)(yylloc.first_line)
   #define parsererror(str) yyerror(&yylloc, yyscanner, NULL, str)
+  #define require_support(flag, error) \
+    if (!(yyget_extra(yyscanner)->opts & flag)) { \
+      terminate(yyscanner, error); \
+      break; \
+    }
 
   void terminate(void* yyscanner, const char* str) {
     fbjs_parse_extra* extra = yyget_extra(yyscanner);
@@ -117,7 +122,7 @@
 
 // Statements
 %type<node> statement block statement_list source_element
-%type<node> variable_statement variable_declaration_list variable_declaration initializer
+%type<node> variable_statement variable_declaration_list variable_declaration identifier_typehint_permitted initializer
 %type<node> variable_declaration_list_no_in variable_declaration_no_in initializer_no_in
 %type<node> empty_statement expression_statement if_statement iteration_statement continue_statement break_statement return_statement with_statement switch_statement
 %type<node> case_block case_clauses_opt case_clauses labelled_statement
@@ -268,6 +273,11 @@ object_literal:
 |   t_LCURLY property_name_and_value_list t_VIRTUAL_SEMICOLON t_RCURLY { /* note the t_VIRTUAL_SEMICOLON hack */
       $$ = $2;
     }
+|   t_LCURLY property_name_and_value_list t_COMMA t_VIRTUAL_SEMICOLON t_RCURLY {
+      require_support(PARSE_OBJECT_LITERAL_ELISON, "object literal elisons not supported");
+      $$ = $2;
+    }
+
 ;
 
 property_name:
@@ -879,10 +889,18 @@ variable_declaration_list:
 ;
 
 variable_declaration:
-    identifier initializer {
+    identifier_typehint_permitted initializer {
       $$ = (new NodeAssignment(ASSIGN, yylineno))->appendChild($1)->appendChild($2);
     }
-|   identifier
+|   identifier_typehint_permitted
+;
+
+identifier_typehint_permitted:
+    identifier
+|   identifier t_COLON identifier {
+      require_support(PARSE_TYPEHINT, "typehints not supported");
+      $$ = (new NodeTypehint(yylineno))->appendChild($1)->appendChild($3);
+    }
 ;
 
 initializer:
@@ -1117,10 +1135,10 @@ function_expression:
 ;
 
 formal_parameter_list:
-    identifier {
+    identifier_typehint_permitted {
       $$ = (new NodeArgList(yylineno))->appendChild($1);
     }
-|   formal_parameter_list t_COMMA identifier {
+|   formal_parameter_list t_COMMA identifier_typehint_permitted {
       $$ = $1->appendChild($3);
     }
 ;

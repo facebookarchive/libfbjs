@@ -48,6 +48,7 @@ struct fbjs_parse_extra {
   int last_paren_tok;
   int last_curly_tok;
   int lineno;
+  fbjs::node_parse_enum opts;
 };
 
 // Why the hell doesn't flex provide a header file?

@@ -38,6 +38,11 @@ namespace fbjs {
     RENDER_PRETTY = 1,
     RENDER_MAINTAIN_LINENO = 2,
   };
+  enum node_parse_enum {
+    PARSE_NONE = 0,
+    PARSE_TYPEHINT = 1,
+    PARSE_OBJECT_LITERAL_ELISON = 2,
+  };
   struct render_guts_t {
     unsigned int lineno;
     bool pretty;
@@ -86,8 +91,8 @@ namespace fbjs {
     public:
       NODE_WALKER_ACCEPT_DECL;
       NodeProgram();
-      NodeProgram(const char* code);
-      NodeProgram(FILE* file);
+      NodeProgram(const char* code, node_parse_enum opts = PARSE_NONE);
+      NodeProgram(FILE* file, node_parse_enum opts = PARSE_NONE);
       virtual Node* clone(Node* node = NULL) const;
   };
 
@@ -426,6 +431,16 @@ namespace fbjs {
       virtual rope_t render(render_guts_t* guts, int indentation) const;
       bool iterator() const; // TODO: kill this
       Node* setIterator(bool iterator);
+  };
+
+  //
+  // NodeTypehint
+  class NodeTypehint: public Node {
+    public:
+      NODE_WALKER_ACCEPT_DECL;
+      NodeTypehint(const unsigned int lineno = 0);
+      virtual Node* clone(Node* node = NULL) const;
+      virtual rope_t render(render_guts_t* guts, int indentation) const;
   };
 
   //

@@ -60,9 +60,10 @@ void fbjs_cleanup_parser(fbjs_parse_extra* extra, void* scanner) {
 
 //
 // Parse from a file
-NodeProgram::NodeProgram(FILE* file) : Node(1) {
+NodeProgram::NodeProgram(FILE* file, node_parse_enum opts /* = PARSE_NONE */) : Node(1) {
   fbjs_parse_extra extra;
   void* scanner = fbjs_init_parser(&extra);
+  extra.opts = opts;
   yyrestart(file, scanner); // read from file
   yyparse(scanner, this);
   fbjs_cleanup_parser(&extra, scanner);
@@ -70,9 +71,10 @@ NodeProgram::NodeProgram(FILE* file) : Node(1) {
 
 //
 // Parser from a string
-NodeProgram::NodeProgram(const char* str) : Node(1) {
+NodeProgram::NodeProgram(const char* str, node_parse_enum opts /* = PARSE_NONE */) : Node(1) {
   fbjs_parse_extra extra;
   void* scanner = fbjs_init_parser(&extra);
+  extra.opts = opts;
   yy_scan_string(str, scanner); // read from string
   yyparse(scanner, this);
   fbjs_cleanup_parser(&extra, scanner);
