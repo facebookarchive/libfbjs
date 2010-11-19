@@ -46,6 +46,23 @@ namespace fbjs {
       }
 
     protected:
+      template<class T>
+      static T& cast(NodeWalker& node) {
+        T* tmp = dynamic_cast<T*>(&node);
+        if (tmp) {
+          return *tmp;
+        } else {
+          throw std::runtime_error("invalid NodeWalker");
+        }
+      }
+
+      template<class T>
+      static std::auto_ptr<T> cast(NodeWalker::ptr node) {
+        std::auto_ptr<T> casted(&cast<T>(*node));
+        node.release();
+        return casted;
+      }
+
       void remove(bool skip_delete = false) {
         _remove = true;
         _skip_delete = skip_delete;
