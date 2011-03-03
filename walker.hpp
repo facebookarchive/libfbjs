@@ -110,11 +110,11 @@ namespace fbjs {
 
         Node* old_node = NULL;
         if (walker->_remove) {
-          old_node = _node->replaceChild(NULL, ii);
+          old_node = _node->removeChild(ii);
         } else if (*ii != walker->_node) {
           old_node = _node->replaceChild(walker->_node, ii);
         }
-
+      
         if (!walker->_skip_delete && old_node) {
           delete old_node;
         }
